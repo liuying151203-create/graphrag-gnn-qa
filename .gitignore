@@ -27,9 +27,12 @@ env/
 Thumbs.db
 
 # Data and generated artifacts
-data/raw/
-data/processed/
-data/tmp/
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/tmp/*
+!data/tmp/.gitkeep
 outputs/
 checkpoints/
 models/

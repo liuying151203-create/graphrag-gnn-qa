@@ -98,6 +98,32 @@ http://localhost:8000/health
   -> 后续写入 Milvus 和 Neo4j
 ```
 
+### 生成文本块数据
+
+将原始文档放入：
+
+```text
+data/raw/
+```
+
+运行：
+
+```powershell
+python scripts/ingest_documents.py
+```
+
+默认输出：
+
+```text
+data/processed/chunks.jsonl
+```
+
+也可以自定义切分参数：
+
+```powershell
+python scripts/ingest_documents.py --chunk-size 800 --chunk-overlap 120
+```
+
 ## 初步开发路线
 
 ### 阶段一：项目初始化
