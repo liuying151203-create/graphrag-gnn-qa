@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+python-dotenv
+langchain
+langchain-community
+neo4j
+pymilvus
+sentence-transformers
+FlagEmbedding
+torch
+numpy
+pandas
+scikit-learn
+tqdm
+pytest
