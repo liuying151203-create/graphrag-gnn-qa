@@ -26,6 +26,51 @@
 - PyTorch Geometric
 - GAT
 
+## 本地运行
+
+### 创建虚拟环境
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\activate
+```
+
+### 安装依赖
+
+```powershell
+pip install -r requirements.txt
+```
+
+### 创建本地环境变量文件
+
+```powershell
+copy .env.example .env
+```
+
+### 启动 API 服务
+
+```powershell
+uvicorn graphrag_gnn_qa.main:app --app-dir src --reload
+```
+
+### 健康检查
+
+访问：
+
+```text
+http://localhost:8000/health
+```
+
+预期返回：
+
+```json
+{
+  "status": "ok",
+  "app_name": "graphrag-gnn-qa",
+  "environment": "development"
+}
+```
+
 ## 初步开发路线
 
 ### 阶段一：项目初始化
