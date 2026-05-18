@@ -46,6 +46,7 @@ python -m venv .venv
 
 ```powershell
 pip install -r requirements.txt
+pip install -e .
 ```
 
 ### 创建本地环境变量文件
