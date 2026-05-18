@@ -87,6 +87,7 @@ http://localhost:8000/health
 - `.env` 环境变量加载
 - TXT、Markdown、PDF 文档读取
 - 固定长度重叠文本切分
+- 基于 BGE-m3 的文本向量生成脚本
 - Pytest 自动化测试
 
 ## 文档处理流程
@@ -97,6 +98,8 @@ http://localhost:8000/health
 输入 TXT / Markdown / PDF
   -> DocumentLoader 读取文本内容
   -> TextSplitter 切分为带 chunk_id 的文本块
+  -> 生成 chunks.jsonl
+  -> Embedding 模块生成 chunk_embeddings.jsonl
   -> 后续写入 Milvus 和 Neo4j
 ```
 
@@ -124,6 +127,26 @@ data/processed/chunks.jsonl
 
 ```powershell
 python scripts/ingest_documents.py --chunk-size 800 --chunk-overlap 120
+```
+
+### 生成文本向量数据
+
+在生成 `chunks.jsonl` 后，运行：
+
+```powershell
+python scripts/embed_chunks.py
+```
+
+默认输出：
+
+```text
+data/processed/chunk_embeddings.jsonl
+```
+
+可以指定 Embedding 模型：
+
+```powershell
+python scripts/embed_chunks.py --model-name BAAI/bge-m3 --batch-size 16
 ```
 
 ## 初步开发路线

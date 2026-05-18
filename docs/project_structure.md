@@ -20,6 +20,7 @@ graphrag-gnn-qa/
 │   ├── graph_schema.md
 │   └── project_structure.md
 ├── scripts/
+│   ├── embed_chunks.py
 │   └── ingest_documents.py
 ├── src/
 │   └── graphrag_gnn_qa/
@@ -29,12 +30,17 @@ graphrag-gnn-qa/
 │       ├── api/
 │       │   ├── __init__.py
 │       │   └── routes_health.py
-│       └── ingestion/
+│       ├── ingestion/
+│       │   ├── __init__.py
+│       │   ├── document_loader.py
+│       │   └── text_splitter.py
+│       └── vectorstore/
 │           ├── __init__.py
-│           ├── document_loader.py
-│           └── text_splitter.py
+│           └── embedding.py
 ├── tests/
 │   ├── test_document_loader.py
+│   ├── test_embed_chunks.py
+│   ├── test_embedding.py
 │   ├── test_health.py
 │   ├── test_ingest_documents.py
 │   └── test_text_splitter.py
@@ -149,6 +155,23 @@ API 路由目录。
 - `start_index`：在原文中的起始位置
 - `end_index`：在原文中的结束位置
 
+### `vectorstore/`
+
+向量检索相关模块目录。
+
+当前包含：
+
+- `embedding.py`：文本向量模型封装
+
+#### `embedding.py`
+
+负责将文本转换为向量表示。
+
+当前包含两类模型：
+
+- `SentenceTransformerEmbeddingModel`：基于 `sentence-transformers` 加载 BGE-m3 等真实 Embedding 模型
+- `HashEmbeddingModel`：轻量确定性假向量模型，用于单元测试，避免测试阶段下载大模型
+
 ## `scripts/`
 
 命令行脚本目录，用于执行离线任务。
@@ -176,6 +199,31 @@ python scripts/ingest_documents.py
 
 ```powershell
 python scripts/ingest_documents.py --chunk-size 800 --chunk-overlap 120
+```
+
+### `embed_chunks.py`
+
+当前已经实现的文本向量生成脚本。
+
+默认流程：
+
+```text
+data/processed/chunks.jsonl
+  -> 读取 chunk content
+  -> 使用 Embedding 模型生成向量
+  -> data/processed/chunk_embeddings.jsonl
+```
+
+运行方式：
+
+```powershell
+python scripts/embed_chunks.py
+```
+
+可选参数：
+
+```powershell
+python scripts/embed_chunks.py --model-name BAAI/bge-m3 --batch-size 16
 ```
 
 ## `data/`
@@ -249,15 +297,16 @@ python -m pytest
   -> TextChunk 列表
   -> ingest_documents.py
   -> chunks.jsonl
+  -> embed_chunks.py
+  -> chunk_embeddings.jsonl
 ```
 
 ## 后续扩展方向
 
-下一阶段会在当前 `chunks.jsonl` 基础上继续实现：
+下一阶段会在当前 `chunk_embeddings.jsonl` 基础上继续实现：
 
 ```text
-chunks.jsonl
-  -> BGE-m3 Embedding
+chunk_embeddings.jsonl
   -> Milvus 向量存储
   -> Vector Search Baseline
 ```
