@@ -3,6 +3,7 @@ httpx
 uvicorn[standard]
 pydantic
 pydantic-settings
+pypdf
 python-dotenv
 langchain
 langchain-community

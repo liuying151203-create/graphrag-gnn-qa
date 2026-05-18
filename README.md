@@ -78,6 +78,26 @@ http://localhost:8000/health
 }
 ```
 
+## 当前已实现能力
+
+- FastAPI 服务启动
+- `/health` 健康检查接口
+- `.env` 环境变量加载
+- TXT、Markdown、PDF 文档读取
+- 固定长度重叠文本切分
+- Pytest 自动化测试
+
+## 文档处理流程
+
+当前阶段的文档处理流程：
+
+```text
+输入 TXT / Markdown / PDF
+  -> DocumentLoader 读取文本内容
+  -> TextSplitter 切分为带 chunk_id 的文本块
+  -> 后续写入 Milvus 和 Neo4j
+```
+
 ## 初步开发路线
 
 ### 阶段一：项目初始化
