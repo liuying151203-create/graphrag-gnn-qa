@@ -26,6 +26,13 @@
 - PyTorch Geometric
 - GAT
 
+## 项目文档
+
+- [系统架构设计](docs/architecture.md)
+- [API 设计](docs/api.md)
+- [知识图谱 Schema 设计](docs/graph_schema.md)
+- [实验设计](docs/experiments.md)
+
 ## 本地运行
 
 ### 创建虚拟环境
