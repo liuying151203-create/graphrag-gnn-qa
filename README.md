@@ -32,6 +32,7 @@
 - [API 设计](docs/api.md)
 - [知识图谱 Schema 设计](docs/graph_schema.md)
 - [实验设计](docs/experiments.md)
+- [项目结构说明](docs/project_structure.md)
 
 ## 本地运行
 
