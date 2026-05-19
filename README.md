@@ -89,6 +89,7 @@ http://localhost:8000/health
 - 固定长度重叠文本切分
 - 基于 BGE-m3 的文本向量生成脚本
 - Milvus 向量集合创建与文本块向量导入脚本
+- 基于 Milvus 的文本块 TopK 向量检索脚本
 - Pytest 自动化测试
 
 ## 文档处理流程
@@ -102,7 +103,8 @@ http://localhost:8000/health
   -> 生成 chunks.jsonl
   -> Embedding 模块生成 chunk_embeddings.jsonl
   -> 写入 Milvus
-  -> 后续接入 Vector Search 和 Neo4j
+  -> Vector Search TopK 检索
+  -> 后续接入 Neo4j 和问答生成
 ```
 
 ### 生成文本块数据
@@ -170,6 +172,21 @@ python scripts/load_embeddings_to_milvus.py
 ```powershell
 python scripts/load_embeddings_to_milvus.py --drop-existing
 ```
+
+### 检索相关文本块
+
+在完成 Milvus 导入后，可以输入一个问题检索最相关的文本块：
+
+```powershell
+python scripts/search_chunks.py "What is GraphRAG?" --top-k 3
+```
+
+当前阶段会输出相关文本块的：
+
+- 相似度分数
+- `chunk_id`
+- 来源文件
+- 文本块内容
 
 ## 初步开发路线
 

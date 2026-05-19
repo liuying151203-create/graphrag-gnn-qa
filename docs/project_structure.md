@@ -22,7 +22,8 @@ graphrag-gnn-qa/
 ├── scripts/
 │   ├── embed_chunks.py
 │   ├── ingest_documents.py
-│   └── load_embeddings_to_milvus.py
+│   ├── load_embeddings_to_milvus.py
+│   └── search_chunks.py
 ├── src/
 │   └── graphrag_gnn_qa/
 │       ├── __init__.py
@@ -35,6 +36,9 @@ graphrag-gnn-qa/
 │       │   ├── __init__.py
 │       │   ├── document_loader.py
 │       │   └── text_splitter.py
+│       ├── retrieval/
+│       │   ├── __init__.py
+│       │   └── vector_retriever.py
 │       └── vectorstore/
 │           ├── __init__.py
 │           ├── embedding.py
@@ -46,7 +50,8 @@ graphrag-gnn-qa/
 │   ├── test_health.py
 │   ├── test_ingest_documents.py
 │   ├── test_milvus_client.py
-│   └── test_text_splitter.py
+│   ├── test_text_splitter.py
+│   └── test_vector_retriever.py
 ├── .env.example
 ├── .gitignore
 ├── docker-compose.yml
@@ -188,6 +193,24 @@ API 路由目录。
 - `prepare_insert_columns`：将记录转换为 Milvus 插入格式
 - `MilvusVectorStore`：封装 Milvus 连接、collection 创建、插入和搜索
 
+### `retrieval/`
+
+检索逻辑模块目录。
+
+当前包含：
+
+- `vector_retriever.py`：Vector-only 检索服务
+
+#### `vector_retriever.py`
+
+负责将用户问题转换成 query embedding，并调用向量库返回 TopK 文本块。
+
+当前包含：
+
+- `VectorSearchStore`：向量搜索存储接口
+- `RetrievedChunk`：检索结果结构
+- `VectorRetriever`：封装 query embedding 和 vector search 的检索流程
+
 ## `scripts/`
 
 命令行脚本目录，用于执行离线任务。
@@ -268,6 +291,25 @@ python scripts/load_embeddings_to_milvus.py
 python scripts/load_embeddings_to_milvus.py --drop-existing
 ```
 
+### `search_chunks.py`
+
+当前已经实现的 Vector Search Baseline 查询脚本。
+
+默认流程：
+
+```text
+用户问题
+  -> BGE-m3 query embedding
+  -> Milvus rag_chunks collection
+  -> TopK 相关文本块
+```
+
+运行方式：
+
+```powershell
+python scripts/search_chunks.py "What is GraphRAG?" --top-k 3
+```
+
 ## `data/`
 
 数据目录。
@@ -343,17 +385,19 @@ python -m pytest
   -> chunk_embeddings.jsonl
   -> load_embeddings_to_milvus.py
   -> Milvus collection
+  -> search_chunks.py
+  -> TopK RetrievedChunk 列表
 ```
 
 ## 后续扩展方向
 
-下一阶段会在当前 Milvus collection 基础上继续实现：
+下一阶段会在当前 Vector Search Baseline 基础上继续实现：
 
 ```text
 用户问题
-  -> BGE-m3 Query Embedding
-  -> Milvus Vector Search TopK
-  -> Vector-only RAG Baseline
+  -> TopK RetrievedChunk
+  -> Prompt 构造
+  -> LLM 生成回答
 ```
 
 之后继续扩展：
