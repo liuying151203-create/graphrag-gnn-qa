@@ -133,6 +133,53 @@ multipart/form-data
 }
 ```
 
+## 图谱检索接口
+
+### `POST /graph/retrieve`
+
+用于接收实体关键词或短查询，并返回 Neo4j 中匹配中心节点的邻域关系。
+
+当前状态：已实现。
+
+请求示例：
+
+```json
+{
+  "query": "GraphRAG",
+  "top_k": 5,
+  "max_depth": 2
+}
+```
+
+响应示例：
+
+```json
+{
+  "query": "GraphRAG",
+  "top_k": 5,
+  "max_depth": 2,
+  "results": [
+    {
+      "center_id": "Method:graphrag",
+      "center_name": "GraphRAG",
+      "center_type": "Method",
+      "source_id": "Method:graphrag",
+      "source_name": "GraphRAG",
+      "source_type": "Method",
+      "relation_type": "SOLVES_TASK",
+      "target_id": "Task:question answering",
+      "target_name": "question answering",
+      "target_type": "Task",
+      "chunk_id": "sample_chunk_0000",
+      "document_id": "sample",
+      "source": "sample.txt",
+      "evidence": "GraphRAG improves question answering.",
+      "confidence": 0.9
+    }
+  ]
+}
+```
+
 ## 检索调试接口
 
 ### `POST /retrieval/debug`

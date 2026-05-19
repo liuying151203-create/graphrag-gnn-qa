@@ -34,6 +34,7 @@ graphrag-gnn-qa/
 │       ├── main.py
 │       ├── api/
 │       │   ├── __init__.py
+│       │   ├── routes_graph.py
 │       │   ├── routes_health.py
 │       │   ├── routes_qa.py
 │       │   └── routes_retrieve.py
@@ -66,6 +67,7 @@ graphrag-gnn-qa/
 │   ├── test_embedding.py
 │   ├── test_extract_graph.py
 │   ├── test_graph_extractor.py
+│   ├── test_graph_api.py
 │   ├── test_graph_retriever.py
 │   ├── test_health.py
 │   ├── test_ingest_documents.py
@@ -148,6 +150,7 @@ API 路由目录。
 当前包含：
 
 - `routes_health.py`：健康检查接口
+- `routes_graph.py`：图谱检索接口
 - `routes_qa.py`：问答接口
 - `routes_retrieve.py`：向量检索接口
 
@@ -173,9 +176,21 @@ POST /retrieve
 
 该接口接收用户问题，生成 query embedding，调用 Milvus 返回 TopK 相关文本块。
 
+#### `routes_graph.py`
+
+提供图谱检索 API。
+
+当前包含：
+
+```text
+POST /graph/retrieve
+```
+
+该接口接收实体关键词或短查询，调用 Neo4j 返回匹配中心节点的邻域关系。
+
 #### `routes_qa.py`
 
-提供 Vector-only RAG 问答 API。
+提供 GraphRAG-aware 问答 API。
 
 当前接口：
 
@@ -183,7 +198,7 @@ POST /retrieve
 POST /qa/ask
 ```
 
-该接口接收用户问题，先检索相关文本块，再调用 LLM 生成答案和来源证据。
+该接口接收用户问题，检索相关文本块和图谱关系，再调用 LLM 生成答案和来源证据。
 
 ### `ingestion/`
 
@@ -586,8 +601,9 @@ graph_triples.jsonl
 - Milvus 导入辅助逻辑
 - Vector-only 检索模块
 - Graph-only 检索模块
+- 图谱检索 API
 - Query entity extraction 模块
-- Vector-only RAG 问答模块
+- GraphRAG-aware 问答模块
 - 实体关系抽取模块
 - Neo4j 图谱写入模块
 

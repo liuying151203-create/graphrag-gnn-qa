@@ -91,6 +91,7 @@ http://localhost:8000/health
 - Milvus 向量集合创建与文本块向量导入脚本
 - 基于 Milvus 的文本块 TopK 向量检索脚本
 - `POST /retrieve` 向量检索 API
+- `POST /graph/retrieve` 图谱检索 API
 - `POST /qa/ask` GraphRAG-aware 问答 API
 - 基于 LLM 的实体关系抽取脚本
 - Neo4j 图谱节点与关系写入脚本
@@ -214,6 +215,22 @@ POST /retrieve
 {
   "query": "What is GraphRAG?",
   "top_k": 3
+}
+```
+
+图谱检索 API：
+
+```text
+POST /graph/retrieve
+```
+
+请求示例：
+
+```json
+{
+  "query": "GraphRAG",
+  "top_k": 5,
+  "max_depth": 2
 }
 ```
 

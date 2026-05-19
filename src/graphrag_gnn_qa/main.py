@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from graphrag_gnn_qa.api.routes_graph import router as graph_router
 from graphrag_gnn_qa.api.routes_health import router as health_router
 from graphrag_gnn_qa.api.routes_qa import router as qa_router
 from graphrag_gnn_qa.api.routes_retrieve import router as retrieve_router
@@ -15,6 +16,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(health_router)
     app.include_router(retrieve_router)
+    app.include_router(graph_router)
     app.include_router(qa_router)
     return app
 
