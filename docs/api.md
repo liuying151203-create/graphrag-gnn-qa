@@ -80,6 +80,43 @@ multipart/form-data
 }
 ```
 
+## 向量检索接口
+
+### `POST /retrieve`
+
+用于接收用户问题，并返回 Milvus 中最相关的 TopK 文本块。
+
+当前状态：已实现。
+
+请求示例：
+
+```json
+{
+  "query": "What is GraphRAG?",
+  "top_k": 3
+}
+```
+
+响应示例：
+
+```json
+{
+  "query": "What is GraphRAG?",
+  "top_k": 3,
+  "results": [
+    {
+      "score": 0.91,
+      "chunk_id": "sample_chunk_0000",
+      "document_id": "sample",
+      "content": "GraphRAG connects vector search and graph traversal.",
+      "source": "sample.txt",
+      "file_name": "sample.txt",
+      "file_type": "txt"
+    }
+  ]
+}
+```
+
 ## 检索调试接口
 
 ### `POST /retrieval/debug`

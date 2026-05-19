@@ -31,7 +31,8 @@ graphrag-gnn-qa/
 │       ├── main.py
 │       ├── api/
 │       │   ├── __init__.py
-│       │   └── routes_health.py
+│       │   ├── routes_health.py
+│       │   └── routes_retrieve.py
 │       ├── ingestion/
 │       │   ├── __init__.py
 │       │   ├── document_loader.py
@@ -50,6 +51,7 @@ graphrag-gnn-qa/
 │   ├── test_health.py
 │   ├── test_ingest_documents.py
 │   ├── test_milvus_client.py
+│   ├── test_retrieve_api.py
 │   ├── test_text_splitter.py
 │   └── test_vector_retriever.py
 ├── .env.example
@@ -100,10 +102,11 @@ Git 忽略规则，用于避免提交虚拟环境、缓存、日志、模型文�
 
 FastAPI 应用入口，负责创建应用实例并注册路由。
 
-当前已经注册：
+当前接口：
 
 ```text
 GET /health
+POST /retrieve
 ```
 
 ### `config.py`
@@ -119,12 +122,29 @@ API 路由目录。
 当前包含：
 
 - `routes_health.py`：健康检查接口
+- `routes_retrieve.py`：向量检索接口
 
-后续计划增加：
+#### `routes_health.py`
 
-- `routes_documents.py`：文档上传和导入接口
-- `routes_qa.py`：问答接口
-- `routes_retrieval.py`：检索调试接口
+提供健康检查 API。
+
+当前接口：
+
+```text
+GET /health
+```
+
+#### `routes_retrieve.py`
+
+提供向量检索 API。
+
+当前接口：
+
+```text
+POST /retrieve
+```
+
+该接口接收用户问题，生成 query embedding，调用 Milvus 返回 TopK 相关文本块。
 
 ### `ingestion/`
 

@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from graphrag_gnn_qa.api.routes_health import router as health_router
+from graphrag_gnn_qa.api.routes_retrieve import router as retrieve_router
 from graphrag_gnn_qa.config import get_settings
 
 
@@ -12,6 +13,7 @@ def create_app() -> FastAPI:
         description="A GraphRAG and GNN based QA system for complex relational knowledge reasoning.",
     )
     app.include_router(health_router)
+    app.include_router(retrieve_router)
     return app
 
 

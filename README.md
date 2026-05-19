@@ -90,6 +90,7 @@ http://localhost:8000/health
 - 基于 BGE-m3 的文本向量生成脚本
 - Milvus 向量集合创建与文本块向量导入脚本
 - 基于 Milvus 的文本块 TopK 向量检索脚本
+- `POST /retrieve` 向量检索 API
 - Pytest 自动化测试
 
 ## 文档处理流程
@@ -187,6 +188,27 @@ python scripts/search_chunks.py "What is GraphRAG?" --top-k 3
 - `chunk_id`
 - 来源文件
 - 文本块内容
+
+### 启动 API 服务
+
+```powershell
+uvicorn graphrag_gnn_qa.main:app --reload
+```
+
+向量检索 API：
+
+```text
+POST /retrieve
+```
+
+请求示例：
+
+```json
+{
+  "query": "What is GraphRAG?",
+  "top_k": 3
+}
+```
 
 ## 初步开发路线
 
