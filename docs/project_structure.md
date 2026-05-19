@@ -23,6 +23,7 @@ graphrag-gnn-qa/
 │   ├── embed_chunks.py
 │   ├── extract_graph.py
 │   ├── ingest_documents.py
+│   ├── load_graph_to_neo4j.py
 │   ├── load_embeddings_to_milvus.py
 │   └── search_chunks.py
 ├── src/
@@ -37,7 +38,8 @@ graphrag-gnn-qa/
 │       │   └── routes_retrieve.py
 │       ├── graph/
 │       │   ├── __init__.py
-│       │   └── extractor.py
+│       │   ├── extractor.py
+│       │   └── neo4j_store.py
 │       ├── ingestion/
 │       │   ├── __init__.py
 │       │   ├── document_loader.py
@@ -63,7 +65,9 @@ graphrag-gnn-qa/
 │   ├── test_graph_extractor.py
 │   ├── test_health.py
 │   ├── test_ingest_documents.py
+│   ├── test_load_graph_to_neo4j.py
 │   ├── test_milvus_client.py
+│   ├── test_neo4j_store.py
 │   ├── test_qa_api.py
 │   ├── test_qa_service.py
 │   ├── test_retrieve_api.py
@@ -219,6 +223,7 @@ POST /qa/ask
 当前包含：
 
 - `extractor.py`：基于 LLM 的实体关系抽取模块
+- `neo4j_store.py`：Neo4j 图谱写入模块
 
 #### `extractor.py`
 
@@ -232,6 +237,19 @@ POST /qa/ask
 - `GraphExtractor`：调用 LLM 完成实体关系抽取
 - `build_extraction_prompt`：构造抽取提示词
 - `parse_extraction_response`：解析 LLM 返回的 JSON 结果
+
+#### `neo4j_store.py`
+
+负责将实体和关系写入 Neo4j。
+
+当前包含：
+
+- `Neo4jGraphStore`：封装 Neo4j driver、约束创建、节点和关系写入
+- `build_entity_id`：生成稳定实体 ID
+- `build_entity_merge_query`：构造节点 `MERGE` Cypher
+- `build_relation_merge_query`：构造关系 `MERGE` Cypher
+- `validate_entity_type`：校验实体类型白名单
+- `validate_relation_type`：校验关系类型白名单
 
 ### `llm/`
 
@@ -421,6 +439,32 @@ python scripts/load_embeddings_to_milvus.py
 python scripts/load_embeddings_to_milvus.py --drop-existing
 ```
 
+### `load_graph_to_neo4j.py`
+
+当前已经实现的 Neo4j 图谱写入脚本。
+
+默认流程：
+
+```text
+data/processed/graph_triples.jsonl
+  -> 读取 entities 和 relations
+  -> 创建 Neo4j 唯一约束
+  -> MERGE 实体节点
+  -> MERGE 图谱关系并保留 evidence 属性
+```
+
+运行方式：
+
+```powershell
+python scripts/load_graph_to_neo4j.py
+```
+
+如果需要跳过约束创建：
+
+```powershell
+python scripts/load_graph_to_neo4j.py --skip-constraints
+```
+
 ### `search_chunks.py`
 
 当前已经实现的 Vector Search Baseline 查询脚本。
@@ -493,6 +537,7 @@ graph_triples.jsonl
 - Vector-only 检索模块
 - Vector-only RAG 问答模块
 - 实体关系抽取模块
+- Neo4j 图谱写入模块
 
 运行测试：
 
@@ -528,16 +573,18 @@ python -m pytest
   -> answer + sources
   -> extract_graph.py
   -> graph_triples.jsonl
+  -> load_graph_to_neo4j.py
+  -> Neo4j 知识图谱
 ```
 
 ## 后续扩展方向
 
-下一阶段会在当前 `graph_triples.jsonl` 基础上继续实现：
+下一阶段会在当前 Neo4j 知识图谱基础上继续实现：
 
 ```text
-graph_triples.jsonl
-  -> Neo4j 节点和关系写入
-  -> 图谱查询
+Neo4j 知识图谱
+  -> 图谱查询服务
+  -> GraphRAG 混合检索
 ```
 
 之后继续扩展：

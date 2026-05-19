@@ -93,6 +93,7 @@ http://localhost:8000/health
 - `POST /retrieve` 向量检索 API
 - `POST /qa/ask` Vector-only RAG 问答 API
 - 基于 LLM 的实体关系抽取脚本
+- Neo4j 图谱节点与关系写入脚本
 - Pytest 自动化测试
 
 ## 文档处理流程
@@ -109,7 +110,7 @@ http://localhost:8000/health
   -> Vector Search TopK 检索
   -> Vector-only RAG 问答生成
   -> 实体关系抽取生成 graph_triples.jsonl
-  -> 后续写入 Neo4j
+  -> 写入 Neo4j 知识图谱
 ```
 
 ### 生成文本块数据
@@ -249,6 +250,36 @@ data/processed/graph_triples.jsonl
 
 ```powershell
 python scripts/extract_graph.py --limit 3
+```
+
+### 导入 Neo4j
+
+启动 Neo4j：
+
+```powershell
+docker compose up -d neo4j
+```
+
+将 `graph_triples.jsonl` 写入 Neo4j：
+
+```powershell
+python scripts/load_graph_to_neo4j.py
+```
+
+如果已经创建过唯一约束，也可以跳过约束创建：
+
+```powershell
+python scripts/load_graph_to_neo4j.py --skip-constraints
+```
+
+默认会为实体节点创建唯一约束，并按实体类型创建节点，例如 `Method`、`Task`、`Concept`。关系会保留以下证据属性：
+
+```text
+chunk_id
+document_id
+source
+evidence
+confidence
 ```
 
 ## 初步开发路线
