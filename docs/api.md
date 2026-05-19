@@ -184,6 +184,59 @@ multipart/form-data
 
 ### `POST /retrieval/debug`
 
-计划用于展示向量召回、图谱召回、GNN 节点召回和 Rerank 结果。
+用于展示当前问题的向量召回、图谱查询词和图谱召回结果，便于调试 GraphRAG 检索效果。
 
-当前状态：待实现。
+当前状态：已实现 Vector + Graph 检索调试版本。
+
+请求示例：
+
+```json
+{
+  "query": "What is GraphRAG?",
+  "vector_top_k": 3,
+  "graph_top_k": 5,
+  "graph_max_depth": 2
+}
+```
+
+响应示例：
+
+```json
+{
+  "query": "What is GraphRAG?",
+  "vector_top_k": 3,
+  "graph_top_k": 5,
+  "graph_max_depth": 2,
+  "graph_query_terms": ["What is GraphRAG?", "GraphRAG"],
+  "vector_results": [
+    {
+      "score": 0.91,
+      "chunk_id": "sample_chunk_0000",
+      "document_id": "sample",
+      "content": "GraphRAG connects vector search and graph traversal.",
+      "source": "sample.txt",
+      "file_name": "sample.txt",
+      "file_type": "txt"
+    }
+  ],
+  "graph_results": [
+    {
+      "center_id": "Method:graphrag",
+      "center_name": "GraphRAG",
+      "center_type": "Method",
+      "source_id": "Method:graphrag",
+      "source_name": "GraphRAG",
+      "source_type": "Method",
+      "relation_type": "SOLVES_TASK",
+      "target_id": "Task:question answering",
+      "target_name": "question answering",
+      "target_type": "Task",
+      "chunk_id": "sample_chunk_0000",
+      "document_id": "sample",
+      "source": "sample.txt",
+      "evidence": "GraphRAG improves question answering.",
+      "confidence": 0.9
+    }
+  ]
+}
+```

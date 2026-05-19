@@ -34,6 +34,7 @@ graphrag-gnn-qa/
 │       ├── main.py
 │       ├── api/
 │       │   ├── __init__.py
+│       │   ├── routes_debug.py
 │       │   ├── routes_graph.py
 │       │   ├── routes_health.py
 │       │   ├── routes_qa.py
@@ -63,6 +64,7 @@ graphrag-gnn-qa/
 │           └── milvus_client.py
 ├── tests/
 │   ├── test_document_loader.py
+│   ├── test_debug_api.py
 │   ├── test_embed_chunks.py
 │   ├── test_embedding.py
 │   ├── test_extract_graph.py
@@ -150,6 +152,7 @@ API 路由目录。
 当前包含：
 
 - `routes_health.py`：健康检查接口
+- `routes_debug.py`：检索调试接口
 - `routes_graph.py`：图谱检索接口
 - `routes_qa.py`：问答接口
 - `routes_retrieve.py`：向量检索接口
@@ -187,6 +190,18 @@ POST /graph/retrieve
 ```
 
 该接口接收实体关键词或短查询，调用 Neo4j 返回匹配中心节点的邻域关系。
+
+#### `routes_debug.py`
+
+提供检索调试 API。
+
+当前接口：
+
+```text
+POST /retrieval/debug
+```
+
+该接口接收用户问题，同时返回 Milvus 向量召回结果、图谱查询词和 Neo4j 图谱召回结果。
 
 #### `routes_qa.py`
 
@@ -601,6 +616,7 @@ graph_triples.jsonl
 - Milvus 导入辅助逻辑
 - Vector-only 检索模块
 - Graph-only 检索模块
+- 检索调试 API
 - 图谱检索 API
 - Query entity extraction 模块
 - GraphRAG-aware 问答模块

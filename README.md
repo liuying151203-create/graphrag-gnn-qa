@@ -92,6 +92,7 @@ http://localhost:8000/health
 - 基于 Milvus 的文本块 TopK 向量检索脚本
 - `POST /retrieve` 向量检索 API
 - `POST /graph/retrieve` 图谱检索 API
+- `POST /retrieval/debug` 检索调试 API
 - `POST /qa/ask` GraphRAG-aware 问答 API
 - 基于 LLM 的实体关系抽取脚本
 - Neo4j 图谱节点与关系写入脚本
@@ -233,6 +234,29 @@ POST /graph/retrieve
   "max_depth": 2
 }
 ```
+
+检索调试 API：
+
+```text
+POST /retrieval/debug
+```
+
+请求示例：
+
+```json
+{
+  "query": "What is GraphRAG?",
+  "vector_top_k": 3,
+  "graph_top_k": 5,
+  "graph_max_depth": 2
+}
+```
+
+该接口会同时返回：
+
+- `graph_query_terms`：从问题中生成的图谱查询词
+- `vector_results`：Milvus 文本块召回结果
+- `graph_results`：Neo4j 图谱关系召回结果
 
 问答 API：
 
