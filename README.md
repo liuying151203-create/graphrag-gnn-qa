@@ -92,6 +92,7 @@ http://localhost:8000/health
 - 基于 Milvus 的文本块 TopK 向量检索脚本
 - `POST /retrieve` 向量检索 API
 - `POST /qa/ask` Vector-only RAG 问答 API
+- 基于 LLM 的实体关系抽取脚本
 - Pytest 自动化测试
 
 ## 文档处理流程
@@ -106,7 +107,9 @@ http://localhost:8000/health
   -> Embedding 模块生成 chunk_embeddings.jsonl
   -> 写入 Milvus
   -> Vector Search TopK 检索
-  -> 后续接入 Neo4j 和问答生成
+  -> Vector-only RAG 问答生成
+  -> 实体关系抽取生成 graph_triples.jsonl
+  -> 后续写入 Neo4j
 ```
 
 ### 生成文本块数据
@@ -227,6 +230,26 @@ POST /qa/ask
 ```
 
 运行问答 API 前，需要在 `.env` 中配置 `LLM_API_KEY`。
+
+### 抽取实体关系
+
+在生成 `chunks.jsonl` 后，可以运行：
+
+```powershell
+python scripts/extract_graph.py
+```
+
+默认输出：
+
+```text
+data/processed/graph_triples.jsonl
+```
+
+调试时可以只处理前几条 chunk：
+
+```powershell
+python scripts/extract_graph.py --limit 3
+```
 
 ## 初步开发路线
 

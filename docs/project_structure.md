@@ -21,6 +21,7 @@ graphrag-gnn-qa/
 │   └── project_structure.md
 ├── scripts/
 │   ├── embed_chunks.py
+│   ├── extract_graph.py
 │   ├── ingest_documents.py
 │   ├── load_embeddings_to_milvus.py
 │   └── search_chunks.py
@@ -34,6 +35,9 @@ graphrag-gnn-qa/
 │       │   ├── routes_health.py
 │       │   ├── routes_qa.py
 │       │   └── routes_retrieve.py
+│       ├── graph/
+│       │   ├── __init__.py
+│       │   └── extractor.py
 │       ├── ingestion/
 │       │   ├── __init__.py
 │       │   ├── document_loader.py
@@ -55,6 +59,8 @@ graphrag-gnn-qa/
 │   ├── test_document_loader.py
 │   ├── test_embed_chunks.py
 │   ├── test_embedding.py
+│   ├── test_extract_graph.py
+│   ├── test_graph_extractor.py
 │   ├── test_health.py
 │   ├── test_ingest_documents.py
 │   ├── test_milvus_client.py
@@ -206,6 +212,27 @@ POST /qa/ask
 - `start_index`：在原文中的起始位置
 - `end_index`：在原文中的结束位置
 
+### `graph/`
+
+知识图谱构建相关模块目录。
+
+当前包含：
+
+- `extractor.py`：基于 LLM 的实体关系抽取模块
+
+#### `extractor.py`
+
+负责从文本块中抽取符合 `docs/graph_schema.md` 的实体和关系。
+
+当前包含：
+
+- `GraphEntity`：图谱实体结构
+- `GraphRelation`：图谱关系结构
+- `GraphExtractionResult`：单个文本块的抽取结果
+- `GraphExtractor`：调用 LLM 完成实体关系抽取
+- `build_extraction_prompt`：构造抽取提示词
+- `parse_extraction_response`：解析 LLM 返回的 JSON 结果
+
 ### `llm/`
 
 大语言模型调用模块目录。
@@ -344,6 +371,30 @@ python scripts/embed_chunks.py
 python scripts/embed_chunks.py --model-name BAAI/bge-m3 --batch-size 16
 ```
 
+### `extract_graph.py`
+
+当前已经实现的实体关系抽取脚本。
+
+默认流程：
+
+```text
+data/processed/chunks.jsonl
+  -> 调用 LLM 抽取 entities 和 relations
+  -> data/processed/graph_triples.jsonl
+```
+
+运行方式：
+
+```powershell
+python scripts/extract_graph.py
+```
+
+调试时可以限制处理数量：
+
+```powershell
+python scripts/extract_graph.py --limit 3
+```
+
 ### `load_embeddings_to_milvus.py`
 
 当前已经实现的 Milvus 向量导入脚本。
@@ -405,6 +456,8 @@ python scripts/search_chunks.py "What is GraphRAG?" --top-k 3
 
 ```text
 chunks.jsonl
+chunk_embeddings.jsonl
+graph_triples.jsonl
 ```
 
 生成数据不会提交到 GitHub。
@@ -435,6 +488,11 @@ chunks.jsonl
 - 文档读取模块
 - 文本切分模块
 - 文档处理脚本
+- Embedding 生成模块
+- Milvus 导入辅助逻辑
+- Vector-only 检索模块
+- Vector-only RAG 问答模块
+- 实体关系抽取模块
 
 运行测试：
 
@@ -466,17 +524,20 @@ python -m pytest
   -> Milvus collection
   -> search_chunks.py
   -> TopK RetrievedChunk 列表
+  -> RAGQAService
+  -> answer + sources
+  -> extract_graph.py
+  -> graph_triples.jsonl
 ```
 
 ## 后续扩展方向
 
-下一阶段会在当前 Vector Search Baseline 基础上继续实现：
+下一阶段会在当前 `graph_triples.jsonl` 基础上继续实现：
 
 ```text
-用户问题
-  -> TopK RetrievedChunk
-  -> Prompt 构造
-  -> LLM 生成回答
+graph_triples.jsonl
+  -> Neo4j 节点和关系写入
+  -> 图谱查询
 ```
 
 之后继续扩展：
