@@ -1,6 +1,13 @@
 import pytest
 
-from graphrag_gnn_qa.rag.qa_service import GraphEvidence, RAGQAService, SourceEvidence, build_rag_prompt
+from graphrag_gnn_qa.rag.qa_service import (
+    GraphEvidence,
+    RAGQAService,
+    SourceEvidence,
+    build_graph_query_terms,
+    build_rag_prompt,
+    retrieve_graph_relations_for_question,
+)
 from graphrag_gnn_qa.retrieval.graph_retriever import RetrievedGraphRelation
 from graphrag_gnn_qa.retrieval.vector_retriever import RetrievedChunk
 
@@ -21,7 +28,11 @@ class FakeRetriever:
 
 
 class FakeGraphRetriever:
+    def __init__(self) -> None:
+        self.queries: list[str] = []
+
     def retrieve(self, query: str, top_k: int = 5, max_depth: int = 1) -> list[RetrievedGraphRelation]:
+        self.queries.append(query)
         return [
             RetrievedGraphRelation(
                 center_id="Method:graphrag",
@@ -41,6 +52,17 @@ class FakeGraphRetriever:
                 confidence=0.9,
             )
         ]
+
+
+class EntityOnlyFakeGraphRetriever:
+    def __init__(self) -> None:
+        self.queries: list[str] = []
+
+    def retrieve(self, query: str, top_k: int = 5, max_depth: int = 1) -> list[RetrievedGraphRelation]:
+        self.queries.append(query)
+        if query != "GraphRAG":
+            return []
+        return FakeGraphRetriever().retrieve(query=query, top_k=top_k, max_depth=max_depth)
 
 
 class FakeLLMClient:
@@ -135,6 +157,25 @@ def test_rag_qa_service_returns_graph_sources() -> None:
             confidence=0.9,
         )
     ]
+
+
+def test_build_graph_query_terms_extracts_entities_from_question() -> None:
+    assert build_graph_query_terms("What is GraphRAG?") == ["What is GraphRAG?", "GraphRAG"]
+
+
+def test_retrieve_graph_relations_for_question_uses_extracted_entity() -> None:
+    graph_retriever = EntityOnlyFakeGraphRetriever()
+
+    relations = retrieve_graph_relations_for_question(
+        graph_retriever=graph_retriever,
+        question="What is GraphRAG?",
+        top_k=3,
+        max_depth=2,
+    )
+
+    assert graph_retriever.queries[:2] == ["What is GraphRAG?", "GraphRAG"]
+    assert len(relations) == 1
+    assert relations[0].center_name == "GraphRAG"
 
 
 def test_rag_qa_service_rejects_empty_question() -> None:

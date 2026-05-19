@@ -54,6 +54,7 @@ graphrag-gnn-qa/
 │       ├── retrieval/
 │       │   ├── __init__.py
 │       │   ├── graph_retriever.py
+│       │   ├── query_entities.py
 │       │   └── vector_retriever.py
 │       └── vectorstore/
 │           ├── __init__.py
@@ -73,6 +74,7 @@ graphrag-gnn-qa/
 │   ├── test_neo4j_store.py
 │   ├── test_qa_api.py
 │   ├── test_qa_service.py
+│   ├── test_query_entities.py
 │   ├── test_retrieve_api.py
 │   ├── test_search_graph.py
 │   ├── test_text_splitter.py
@@ -329,6 +331,7 @@ RAG 问答编排模块目录。
 
 - `vector_retriever.py`：Vector-only 检索服务
 - `graph_retriever.py`：Graph-only 检索服务
+- `query_entities.py`：查询问题中的候选实体抽取
 
 #### `vector_retriever.py`
 
@@ -349,6 +352,19 @@ RAG 问答编排模块目录。
 - `GraphSearchStore`：图谱搜索存储接口
 - `RetrievedGraphRelation`：图谱关系检索结果结构
 - `GraphRetriever`：封装 query 规范化、参数校验和图谱邻域检索流程
+
+#### `query_entities.py`
+
+负责从自然语言问题中抽取用于图谱召回的候选实体查询词。
+
+示例：
+
+```text
+What is GraphRAG?
+  -> GraphRAG
+```
+
+当前用于 GraphRAG-aware QA 中的 Neo4j 图谱召回增强。
 
 ## `scripts/`
 
@@ -570,6 +586,7 @@ graph_triples.jsonl
 - Milvus 导入辅助逻辑
 - Vector-only 检索模块
 - Graph-only 检索模块
+- Query entity extraction 模块
 - Vector-only RAG 问答模块
 - 实体关系抽取模块
 - Neo4j 图谱写入模块

@@ -239,6 +239,15 @@ POST /qa/ask
 - `sources`：Milvus 向量检索召回的文本证据
 - `graph_sources`：Neo4j 图谱检索召回的关系证据
 
+图谱召回会先从自然语言问题中抽取候选实体查询词。例如：
+
+```text
+What is GraphRAG?
+  -> GraphRAG
+```
+
+这样可以避免完整问句直接匹配 Neo4j 节点名导致 `graph_sources` 为空。
+
 ### 抽取实体关系
 
 在生成 `chunks.jsonl` 后，可以运行：

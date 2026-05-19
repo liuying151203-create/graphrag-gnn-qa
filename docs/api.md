@@ -50,6 +50,8 @@ multipart/form-data
 
 当前状态：已实现 GraphRAG-aware 版本。
 
+图谱召回会从自然语言问题中抽取候选实体查询词，例如 `What is GraphRAG?` 会额外使用 `GraphRAG` 查询 Neo4j。
+
 请求示例：
 
 ```json

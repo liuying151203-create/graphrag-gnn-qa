@@ -3,6 +3,7 @@ from typing import Protocol
 
 from graphrag_gnn_qa.llm.client import LLMClient
 from graphrag_gnn_qa.retrieval.graph_retriever import RetrievedGraphRelation
+from graphrag_gnn_qa.retrieval.query_entities import extract_query_entities
 from graphrag_gnn_qa.retrieval.vector_retriever import RetrievedChunk
 
 
@@ -79,8 +80,9 @@ class RAGQAService:
         chunks = self.retriever.retrieve(query=normalized_question, top_k=top_k)
         graph_relations = []
         if self.graph_retriever is not None:
-            graph_relations = self.graph_retriever.retrieve(
-                query=normalized_question,
+            graph_relations = retrieve_graph_relations_for_question(
+                graph_retriever=self.graph_retriever,
+                question=normalized_question,
                 top_k=self.graph_top_k,
                 max_depth=self.graph_max_depth,
             )
@@ -156,3 +158,50 @@ def build_rag_prompt(
         f"Question:\n{question}\n\n"
         "Answer:"
     )
+
+
+def retrieve_graph_relations_for_question(
+    graph_retriever: GraphRelationRetriever,
+    question: str,
+    top_k: int,
+    max_depth: int,
+) -> list[RetrievedGraphRelation]:
+    relations: list[RetrievedGraphRelation] = []
+    for query in build_graph_query_terms(question):
+        relations.extend(graph_retriever.retrieve(query=query, top_k=top_k, max_depth=max_depth))
+    return deduplicate_graph_relations(relations)[:top_k]
+
+
+def build_graph_query_terms(question: str) -> list[str]:
+    query_terms = [question.strip()]
+    query_terms.extend(extract_query_entities(question))
+    return deduplicate_query_terms(query_terms)
+
+
+def deduplicate_query_terms(query_terms: list[str]) -> list[str]:
+    seen = set()
+    deduplicated = []
+    for query_term in query_terms:
+        normalized_query_term = query_term.strip()
+        key = normalized_query_term.lower()
+        if normalized_query_term and key not in seen:
+            seen.add(key)
+            deduplicated.append(normalized_query_term)
+    return deduplicated
+
+
+def deduplicate_graph_relations(relations: list[RetrievedGraphRelation]) -> list[RetrievedGraphRelation]:
+    seen = set()
+    deduplicated = []
+    for relation in relations:
+        key = (
+            relation.source_id,
+            relation.relation_type,
+            relation.target_id,
+            relation.chunk_id,
+            relation.evidence,
+        )
+        if key not in seen:
+            seen.add(key)
+            deduplicated.append(relation)
+    return deduplicated
