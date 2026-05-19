@@ -3,6 +3,7 @@ import pytest
 from graphrag_gnn_qa.graph.neo4j_store import (
     build_entity_id,
     build_entity_merge_query,
+    build_neighbor_search_query,
     build_relation_merge_query,
     validate_entity_type,
     validate_relation_type,
@@ -30,6 +31,20 @@ def test_build_relation_merge_query_keeps_evidence_properties() -> None:
     assert "MERGE (source)-[rel:SOLVES_TASK {chunk_id: $chunk_id}]->(target)" in query
     assert "rel.evidence = $evidence" in query
     assert "rel.confidence = $confidence" in query
+
+
+def test_build_neighbor_search_query() -> None:
+    query = build_neighbor_search_query(max_depth=2)
+
+    assert "MATCH path = (center)-[rel*1..2]-(neighbor)" in query
+    assert "toLower(center.name) CONTAINS $query_text" in query
+    assert "relationship.evidence AS evidence" in query
+    assert "relationship.confidence AS confidence" in query
+
+
+def test_build_neighbor_search_query_rejects_invalid_depth() -> None:
+    with pytest.raises(ValueError):
+        build_neighbor_search_query(max_depth=0)
 
 
 def test_validate_entity_type_rejects_unknown_type() -> None:

@@ -94,6 +94,7 @@ http://localhost:8000/health
 - `POST /qa/ask` Vector-only RAG 问答 API
 - 基于 LLM 的实体关系抽取脚本
 - Neo4j 图谱节点与关系写入脚本
+- 基于 Neo4j 的图谱邻域检索脚本
 - Pytest 自动化测试
 
 ## 文档处理流程
@@ -111,6 +112,7 @@ http://localhost:8000/health
   -> Vector-only RAG 问答生成
   -> 实体关系抽取生成 graph_triples.jsonl
   -> 写入 Neo4j 知识图谱
+  -> Graph Search 邻域检索
 ```
 
 ### 生成文本块数据
@@ -281,6 +283,23 @@ source
 evidence
 confidence
 ```
+
+### 检索图谱邻域
+
+在完成 Neo4j 导入后，可以按实体关键词检索图谱邻域：
+
+```powershell
+python scripts/search_graph.py "GraphRAG" --top-k 5 --max-depth 2
+```
+
+当前图谱检索会返回：
+
+- 匹配到的中心节点
+- 邻域关系三元组
+- `chunk_id`
+- `source`
+- `evidence`
+- `confidence`
 
 ## 初步开发路线
 

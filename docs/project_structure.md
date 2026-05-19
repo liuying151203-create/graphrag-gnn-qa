@@ -25,6 +25,7 @@ graphrag-gnn-qa/
 │   ├── ingest_documents.py
 │   ├── load_graph_to_neo4j.py
 │   ├── load_embeddings_to_milvus.py
+│   ├── search_graph.py
 │   └── search_chunks.py
 ├── src/
 │   └── graphrag_gnn_qa/
@@ -52,6 +53,7 @@ graphrag-gnn-qa/
 │       │   └── qa_service.py
 │       ├── retrieval/
 │       │   ├── __init__.py
+│       │   ├── graph_retriever.py
 │       │   └── vector_retriever.py
 │       └── vectorstore/
 │           ├── __init__.py
@@ -63,6 +65,7 @@ graphrag-gnn-qa/
 │   ├── test_embedding.py
 │   ├── test_extract_graph.py
 │   ├── test_graph_extractor.py
+│   ├── test_graph_retriever.py
 │   ├── test_health.py
 │   ├── test_ingest_documents.py
 │   ├── test_load_graph_to_neo4j.py
@@ -71,6 +74,7 @@ graphrag-gnn-qa/
 │   ├── test_qa_api.py
 │   ├── test_qa_service.py
 │   ├── test_retrieve_api.py
+│   ├── test_search_graph.py
 │   ├── test_text_splitter.py
 │   └── test_vector_retriever.py
 ├── .env.example
@@ -324,6 +328,7 @@ RAG 问答编排模块目录。
 当前包含：
 
 - `vector_retriever.py`：Vector-only 检索服务
+- `graph_retriever.py`：Graph-only 检索服务
 
 #### `vector_retriever.py`
 
@@ -334,6 +339,16 @@ RAG 问答编排模块目录。
 - `VectorSearchStore`：向量搜索存储接口
 - `RetrievedChunk`：检索结果结构
 - `VectorRetriever`：封装 query embedding 和 vector search 的检索流程
+
+#### `graph_retriever.py`
+
+负责调用 Neo4j 图谱存储查询中心节点及其邻域关系。
+
+当前包含：
+
+- `GraphSearchStore`：图谱搜索存储接口
+- `RetrievedGraphRelation`：图谱关系检索结果结构
+- `GraphRetriever`：封装 query 规范化、参数校验和图谱邻域检索流程
 
 ## `scripts/`
 
@@ -484,6 +499,25 @@ python scripts/load_graph_to_neo4j.py --skip-constraints
 python scripts/search_chunks.py "What is GraphRAG?" --top-k 3
 ```
 
+### `search_graph.py`
+
+当前已经实现的 Graph Search Baseline 查询脚本。
+
+默认流程：
+
+```text
+用户问题或实体关键词
+  -> Neo4j 节点名称匹配
+  -> 查询 1 到 N 跳邻域关系
+  -> 返回 graph context
+```
+
+运行方式：
+
+```powershell
+python scripts/search_graph.py "GraphRAG" --top-k 5 --max-depth 2
+```
+
 ## `data/`
 
 数据目录。
@@ -535,6 +569,7 @@ graph_triples.jsonl
 - Embedding 生成模块
 - Milvus 导入辅助逻辑
 - Vector-only 检索模块
+- Graph-only 检索模块
 - Vector-only RAG 问答模块
 - 实体关系抽取模块
 - Neo4j 图谱写入模块
@@ -575,6 +610,8 @@ python -m pytest
   -> graph_triples.jsonl
   -> load_graph_to_neo4j.py
   -> Neo4j 知识图谱
+  -> search_graph.py
+  -> Graph context
 ```
 
 ## 后续扩展方向
@@ -582,9 +619,9 @@ python -m pytest
 下一阶段会在当前 Neo4j 知识图谱基础上继续实现：
 
 ```text
-Neo4j 知识图谱
-  -> 图谱查询服务
+Neo4j 知识图谱 + Milvus 向量库
   -> GraphRAG 混合检索
+  -> Graph-aware Answer Generation
 ```
 
 之后继续扩展：

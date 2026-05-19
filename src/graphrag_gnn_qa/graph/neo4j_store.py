@@ -54,6 +54,19 @@ class Neo4jGraphStore:
             self.upsert_graph_record(record)
         return len(records)
 
+    def search_neighbors(self, query: str, top_k: int = 5, max_depth: int = 1) -> list[dict[str, Any]]:
+        query_text = query.strip().lower()
+        if not query_text:
+            raise ValueError("query must not be empty")
+        if top_k <= 0:
+            raise ValueError("top_k must be greater than 0")
+        if max_depth <= 0:
+            raise ValueError("max_depth must be greater than 0")
+
+        with self.driver.session(database=self.database) as session:
+            result = session.run(build_neighbor_search_query(max_depth), query_text=query_text, top_k=top_k)
+            return [dict(record) for record in result]
+
 
 def build_entity_id(entity_type: str, name: str) -> str:
     validate_entity_type(entity_type)
@@ -80,6 +93,34 @@ def build_relation_merge_query(source_type: str, relation_type: str, target_type
         "rel.source = $source, "
         "rel.evidence = $evidence, "
         "rel.confidence = $confidence"
+    )
+
+
+def build_neighbor_search_query(max_depth: int) -> str:
+    if max_depth <= 0:
+        raise ValueError("max_depth must be greater than 0")
+    return (
+        f"MATCH path = (center)-[rel*1..{max_depth}]-(neighbor) "
+        "WHERE toLower(center.name) CONTAINS $query_text OR toLower(center.id) CONTAINS $query_text "
+        "WITH center, relationships(path) AS rels "
+        "LIMIT $top_k "
+        "UNWIND rels AS relationship "
+        "WITH center, relationship, startNode(relationship) AS source_node, endNode(relationship) AS target_node "
+        "RETURN center.id AS center_id, "
+        "center.name AS center_name, "
+        "labels(center)[0] AS center_type, "
+        "source_node.id AS source_id, "
+        "source_node.name AS source_name, "
+        "labels(source_node)[0] AS source_type, "
+        "type(relationship) AS relation_type, "
+        "target_node.id AS target_id, "
+        "target_node.name AS target_name, "
+        "labels(target_node)[0] AS target_type, "
+        "relationship.chunk_id AS chunk_id, "
+        "relationship.document_id AS document_id, "
+        "relationship.source AS source, "
+        "relationship.evidence AS evidence, "
+        "relationship.confidence AS confidence"
     )
 
 
