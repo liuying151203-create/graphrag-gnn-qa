@@ -88,6 +88,7 @@ http://localhost:8000/health
 - TXT、Markdown、PDF 文档读取
 - 固定长度重叠文本切分
 - 基于 BGE-m3 的文本向量生成脚本
+- Milvus 向量集合创建与文本块向量导入脚本
 - Pytest 自动化测试
 
 ## 文档处理流程
@@ -100,7 +101,8 @@ http://localhost:8000/health
   -> TextSplitter 切分为带 chunk_id 的文本块
   -> 生成 chunks.jsonl
   -> Embedding 模块生成 chunk_embeddings.jsonl
-  -> 后续写入 Milvus 和 Neo4j
+  -> 写入 Milvus
+  -> 后续接入 Vector Search 和 Neo4j
 ```
 
 ### 生成文本块数据
@@ -147,6 +149,26 @@ data/processed/chunk_embeddings.jsonl
 
 ```powershell
 python scripts/embed_chunks.py --model-name BAAI/bge-m3 --batch-size 16
+```
+
+### 导入 Milvus
+
+启动 Milvus 相关服务：
+
+```powershell
+docker compose up -d etcd minio milvus
+```
+
+将文本块向量写入 Milvus：
+
+```powershell
+python scripts/load_embeddings_to_milvus.py
+```
+
+如果需要重建 collection：
+
+```powershell
+python scripts/load_embeddings_to_milvus.py --drop-existing
 ```
 
 ## 初步开发路线

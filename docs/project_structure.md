@@ -21,7 +21,8 @@ graphrag-gnn-qa/
 │   └── project_structure.md
 ├── scripts/
 │   ├── embed_chunks.py
-│   └── ingest_documents.py
+│   ├── ingest_documents.py
+│   └── load_embeddings_to_milvus.py
 ├── src/
 │   └── graphrag_gnn_qa/
 │       ├── __init__.py
@@ -36,13 +37,15 @@ graphrag-gnn-qa/
 │       │   └── text_splitter.py
 │       └── vectorstore/
 │           ├── __init__.py
-│           └── embedding.py
+│           ├── embedding.py
+│           └── milvus_client.py
 ├── tests/
 │   ├── test_document_loader.py
 │   ├── test_embed_chunks.py
 │   ├── test_embedding.py
 │   ├── test_health.py
 │   ├── test_ingest_documents.py
+│   ├── test_milvus_client.py
 │   └── test_text_splitter.py
 ├── .env.example
 ├── .gitignore
@@ -162,6 +165,7 @@ API 路由目录。
 当前包含：
 
 - `embedding.py`：文本向量模型封装
+- `milvus_client.py`：Milvus 向量库客户端封装
 
 #### `embedding.py`
 
@@ -171,6 +175,18 @@ API 路由目录。
 
 - `SentenceTransformerEmbeddingModel`：基于 `sentence-transformers` 加载 BGE-m3 等真实 Embedding 模型
 - `HashEmbeddingModel`：轻量确定性假向量模型，用于单元测试，避免测试阶段下载大模型
+
+#### `milvus_client.py`
+
+负责读取文本块向量文件，并将向量写入 Milvus。
+
+当前包含：
+
+- `EmbeddingRecord`：文本块向量记录结构
+- `read_embedding_records`：读取 `chunk_embeddings.jsonl`
+- `infer_embedding_dimension`：推断向量维度
+- `prepare_insert_columns`：将记录转换为 Milvus 插入格式
+- `MilvusVectorStore`：封装 Milvus 连接、collection 创建、插入和搜索
 
 ## `scripts/`
 
@@ -224,6 +240,32 @@ python scripts/embed_chunks.py
 
 ```powershell
 python scripts/embed_chunks.py --model-name BAAI/bge-m3 --batch-size 16
+```
+
+### `load_embeddings_to_milvus.py`
+
+当前已经实现的 Milvus 向量导入脚本。
+
+默认流程：
+
+```text
+data/processed/chunk_embeddings.jsonl
+  -> 读取 EmbeddingRecord
+  -> 推断向量维度
+  -> 创建 Milvus collection
+  -> 插入文本块向量
+```
+
+运行方式：
+
+```powershell
+python scripts/load_embeddings_to_milvus.py
+```
+
+如果需要删除并重建 collection：
+
+```powershell
+python scripts/load_embeddings_to_milvus.py --drop-existing
 ```
 
 ## `data/`
@@ -299,16 +341,19 @@ python -m pytest
   -> chunks.jsonl
   -> embed_chunks.py
   -> chunk_embeddings.jsonl
+  -> load_embeddings_to_milvus.py
+  -> Milvus collection
 ```
 
 ## 后续扩展方向
 
-下一阶段会在当前 `chunk_embeddings.jsonl` 基础上继续实现：
+下一阶段会在当前 Milvus collection 基础上继续实现：
 
 ```text
-chunk_embeddings.jsonl
-  -> Milvus 向量存储
-  -> Vector Search Baseline
+用户问题
+  -> BGE-m3 Query Embedding
+  -> Milvus Vector Search TopK
+  -> Vector-only RAG Baseline
 ```
 
 之后继续扩展：
