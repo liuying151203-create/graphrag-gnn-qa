@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 
 from graphrag_gnn_qa.api.routes_qa import get_qa_service
 from graphrag_gnn_qa.main import app
-from graphrag_gnn_qa.rag.qa_service import QAResult, SourceEvidence
+from graphrag_gnn_qa.rag.qa_service import GraphEvidence, QAResult, SourceEvidence
 
 
 class FakeQAService:
@@ -18,6 +18,22 @@ class FakeQAService:
                     file_name="sample.txt",
                     score=0.91,
                     content="GraphRAG connects vector search and graph traversal.",
+                )
+            ],
+            graph_sources=[
+                GraphEvidence(
+                    center_name="GraphRAG",
+                    center_type="Method",
+                    source_name="GraphRAG",
+                    source_type="Method",
+                    relation_type="SOLVES_TASK",
+                    target_name="question answering",
+                    target_type="Task",
+                    chunk_id="sample_chunk_0000",
+                    document_id="sample",
+                    source="sample.txt",
+                    evidence="GraphRAG improves question answering.",
+                    confidence=0.9,
                 )
             ],
         )
@@ -42,6 +58,22 @@ def test_ask_question() -> None:
                 "file_name": "sample.txt",
                 "score": 0.91,
                 "content": "GraphRAG connects vector search and graph traversal.",
+            }
+        ],
+        "graph_sources": [
+            {
+                "center_name": "GraphRAG",
+                "center_type": "Method",
+                "source_name": "GraphRAG",
+                "source_type": "Method",
+                "relation_type": "SOLVES_TASK",
+                "target_name": "question answering",
+                "target_type": "Task",
+                "chunk_id": "sample_chunk_0000",
+                "document_id": "sample",
+                "source": "sample.txt",
+                "evidence": "GraphRAG improves question answering.",
+                "confidence": 0.9,
             }
         ],
     }

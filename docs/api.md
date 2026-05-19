@@ -46,9 +46,9 @@ multipart/form-data
 
 ### `POST /qa/ask`
 
-用于接收用户问题，并返回基于向量检索上下文生成的答案和来源证据。
+用于接收用户问题，并返回结合向量检索上下文和图谱关系上下文生成的答案和来源证据。
 
-当前状态：已实现 Vector-only RAG 版本。
+当前状态：已实现 GraphRAG-aware 版本。
 
 请求示例：
 
@@ -73,6 +73,22 @@ multipart/form-data
       "file_name": "sample.txt",
       "score": 0.91,
       "content": "GraphRAG connects vector search and graph traversal."
+    }
+  ],
+  "graph_sources": [
+    {
+      "center_name": "GraphRAG",
+      "center_type": "Method",
+      "source_name": "GraphRAG",
+      "source_type": "Method",
+      "relation_type": "SOLVES_TASK",
+      "target_name": "question answering",
+      "target_type": "Task",
+      "chunk_id": "sample_chunk_0000",
+      "document_id": "sample",
+      "source": "sample.txt",
+      "evidence": "GraphRAG improves question answering.",
+      "confidence": 0.9
     }
   ]
 }

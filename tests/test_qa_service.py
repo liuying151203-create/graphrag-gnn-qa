@@ -1,6 +1,7 @@
 import pytest
 
-from graphrag_gnn_qa.rag.qa_service import RAGQAService, SourceEvidence, build_rag_prompt
+from graphrag_gnn_qa.rag.qa_service import GraphEvidence, RAGQAService, SourceEvidence, build_rag_prompt
+from graphrag_gnn_qa.retrieval.graph_retriever import RetrievedGraphRelation
 from graphrag_gnn_qa.retrieval.vector_retriever import RetrievedChunk
 
 
@@ -15,6 +16,29 @@ class FakeRetriever:
                 source="sample.txt",
                 file_name="sample.txt",
                 file_type="txt",
+            )
+        ]
+
+
+class FakeGraphRetriever:
+    def retrieve(self, query: str, top_k: int = 5, max_depth: int = 1) -> list[RetrievedGraphRelation]:
+        return [
+            RetrievedGraphRelation(
+                center_id="Method:graphrag",
+                center_name="GraphRAG",
+                center_type="Method",
+                source_id="Method:graphrag",
+                source_name="GraphRAG",
+                source_type="Method",
+                relation_type="SOLVES_TASK",
+                target_id="Task:question answering",
+                target_name="question answering",
+                target_type="Task",
+                chunk_id="sample_chunk_0000",
+                document_id="sample",
+                source="sample.txt",
+                evidence="GraphRAG improves question answering.",
+                confidence=0.9,
             )
         ]
 
@@ -46,6 +70,18 @@ def test_build_rag_prompt_contains_question_and_context() -> None:
     assert "What is GraphRAG?" in prompt
     assert "GraphRAG connects vector search and graph traversal." in prompt
     assert "Source 1" in prompt
+    assert "Graph Context" in prompt
+
+
+def test_build_rag_prompt_contains_graph_context() -> None:
+    graph_relations = FakeGraphRetriever().retrieve(query="GraphRAG")
+
+    prompt = build_rag_prompt(question="What is GraphRAG?", chunks=[], graph_relations=graph_relations)
+
+    assert "No vector context retrieved." in prompt
+    assert "Graph Source 1" in prompt
+    assert "GraphRAG (Method)" in prompt
+    assert "SOLVES_TASK" in prompt
 
 
 def test_rag_qa_service_returns_answer_and_sources() -> None:
@@ -57,6 +93,7 @@ def test_rag_qa_service_returns_answer_and_sources() -> None:
     assert result.question == "What is GraphRAG?"
     assert result.answer == "GraphRAG combines retrieved text chunks with generation."
     assert "What is GraphRAG?" in llm_client.prompt
+    assert result.graph_sources == []
     assert result.sources == [
         SourceEvidence(
             chunk_id="sample_chunk_0000",
@@ -65,6 +102,37 @@ def test_rag_qa_service_returns_answer_and_sources() -> None:
             file_name="sample.txt",
             score=0.92,
             content="GraphRAG connects vector search and graph traversal.",
+        )
+    ]
+
+
+def test_rag_qa_service_returns_graph_sources() -> None:
+    llm_client = FakeLLMClient()
+    service = RAGQAService(
+        retriever=FakeRetriever(),
+        llm_client=llm_client,
+        graph_retriever=FakeGraphRetriever(),
+        graph_top_k=3,
+        graph_max_depth=2,
+    )
+
+    result = service.answer(question="What is GraphRAG?", top_k=3)
+
+    assert "Graph Source 1" in llm_client.prompt
+    assert result.graph_sources == [
+        GraphEvidence(
+            center_name="GraphRAG",
+            center_type="Method",
+            source_name="GraphRAG",
+            source_type="Method",
+            relation_type="SOLVES_TASK",
+            target_name="question answering",
+            target_type="Task",
+            chunk_id="sample_chunk_0000",
+            document_id="sample",
+            source="sample.txt",
+            evidence="GraphRAG improves question answering.",
+            confidence=0.9,
         )
     ]
 

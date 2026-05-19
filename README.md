@@ -91,7 +91,7 @@ http://localhost:8000/health
 - Milvus 向量集合创建与文本块向量导入脚本
 - 基于 Milvus 的文本块 TopK 向量检索脚本
 - `POST /retrieve` 向量检索 API
-- `POST /qa/ask` Vector-only RAG 问答 API
+- `POST /qa/ask` GraphRAG-aware 问答 API
 - 基于 LLM 的实体关系抽取脚本
 - Neo4j 图谱节点与关系写入脚本
 - 基于 Neo4j 的图谱邻域检索脚本
@@ -109,7 +109,7 @@ http://localhost:8000/health
   -> Embedding 模块生成 chunk_embeddings.jsonl
   -> 写入 Milvus
   -> Vector Search TopK 检索
-  -> Vector-only RAG 问答生成
+  -> GraphRAG-aware 问答生成
   -> 实体关系抽取生成 graph_triples.jsonl
   -> 写入 Neo4j 知识图谱
   -> Graph Search 邻域检索
@@ -233,6 +233,11 @@ POST /qa/ask
 ```
 
 运行问答 API 前，需要在 `.env` 中配置 `LLM_API_KEY`。
+
+当前问答 API 会同时返回：
+
+- `sources`：Milvus 向量检索召回的文本证据
+- `graph_sources`：Neo4j 图谱检索召回的关系证据
 
 ### 抽取实体关系
 
