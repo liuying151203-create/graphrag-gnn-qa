@@ -46,37 +46,35 @@ multipart/form-data
 
 ### `POST /qa/ask`
 
-计划用于接收用户问题，并返回答案、来源证据和图谱路径。
+用于接收用户问题，并返回基于向量检索上下文生成的答案和来源证据。
 
-当前状态：待实现。
+当前状态：已实现 Vector-only RAG 版本。
 
 请求示例：
 
 ```json
 {
-  "question": "哪些论文使用图注意力网络解决信息抽取任务？",
-  "top_k": 5,
-  "use_graph": true,
-  "use_gnn": true
+  "question": "What is GraphRAG?",
+  "top_k": 3
 }
 ```
 
-计划响应：
+响应示例：
 
 ```json
 {
-  "answer": "...",
+  "question": "What is GraphRAG?",
+  "answer": "GraphRAG combines graph-based retrieval with text generation.",
   "sources": [
     {
-      "document": "example.pdf",
-      "chunk_id": "chunk_001",
-      "evidence": "..."
+      "chunk_id": "sample_chunk_0000",
+      "document_id": "sample",
+      "source": "sample.txt",
+      "file_name": "sample.txt",
+      "score": 0.91,
+      "content": "GraphRAG connects vector search and graph traversal."
     }
-  ],
-  "graph_paths": [
-    "Paper A -> USES_METHOD -> GAT -> SOLVES_TASK -> Information Extraction"
-  ],
-  "latency_ms": 1530
+  ]
 }
 ```
 

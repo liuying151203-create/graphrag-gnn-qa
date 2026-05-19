@@ -91,6 +91,7 @@ http://localhost:8000/health
 - Milvus 向量集合创建与文本块向量导入脚本
 - 基于 Milvus 的文本块 TopK 向量检索脚本
 - `POST /retrieve` 向量检索 API
+- `POST /qa/ask` Vector-only RAG 问答 API
 - Pytest 自动化测试
 
 ## 文档处理流程
@@ -209,6 +210,23 @@ POST /retrieve
   "top_k": 3
 }
 ```
+
+问答 API：
+
+```text
+POST /qa/ask
+```
+
+请求示例：
+
+```json
+{
+  "question": "What is GraphRAG?",
+  "top_k": 3
+}
+```
+
+运行问答 API 前，需要在 `.env` 中配置 `LLM_API_KEY`。
 
 ## 初步开发路线
 

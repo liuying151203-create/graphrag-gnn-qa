@@ -32,11 +32,18 @@ graphrag-gnn-qa/
 │       ├── api/
 │       │   ├── __init__.py
 │       │   ├── routes_health.py
+│       │   ├── routes_qa.py
 │       │   └── routes_retrieve.py
 │       ├── ingestion/
 │       │   ├── __init__.py
 │       │   ├── document_loader.py
 │       │   └── text_splitter.py
+│       ├── llm/
+│       │   ├── __init__.py
+│       │   └── client.py
+│       ├── rag/
+│       │   ├── __init__.py
+│       │   └── qa_service.py
 │       ├── retrieval/
 │       │   ├── __init__.py
 │       │   └── vector_retriever.py
@@ -51,6 +58,8 @@ graphrag-gnn-qa/
 │   ├── test_health.py
 │   ├── test_ingest_documents.py
 │   ├── test_milvus_client.py
+│   ├── test_qa_api.py
+│   ├── test_qa_service.py
 │   ├── test_retrieve_api.py
 │   ├── test_text_splitter.py
 │   └── test_vector_retriever.py
@@ -107,6 +116,7 @@ FastAPI 应用入口，负责创建应用实例并注册路由。
 ```text
 GET /health
 POST /retrieve
+POST /qa/ask
 ```
 
 ### `config.py`
@@ -122,6 +132,7 @@ API 路由目录。
 当前包含：
 
 - `routes_health.py`：健康检查接口
+- `routes_qa.py`：问答接口
 - `routes_retrieve.py`：向量检索接口
 
 #### `routes_health.py`
@@ -145,6 +156,18 @@ POST /retrieve
 ```
 
 该接口接收用户问题，生成 query embedding，调用 Milvus 返回 TopK 相关文本块。
+
+#### `routes_qa.py`
+
+提供 Vector-only RAG 问答 API。
+
+当前接口：
+
+```text
+POST /qa/ask
+```
+
+该接口接收用户问题，先检索相关文本块，再调用 LLM 生成答案和来源证据。
 
 ### `ingestion/`
 
@@ -182,6 +205,42 @@ POST /retrieve
 - `content`：文本块内容
 - `start_index`：在原文中的起始位置
 - `end_index`：在原文中的结束位置
+
+### `llm/`
+
+大语言模型调用模块目录。
+
+当前包含：
+
+- `client.py`：OpenAI-compatible LLM 客户端封装
+
+#### `client.py`
+
+负责调用兼容 OpenAI Chat Completions 格式的 LLM 服务。
+
+当前包含：
+
+- `LLMClient`：LLM 调用接口
+- `OpenAICompatibleLLMClient`：基于 `httpx` 的 DeepSeek/OpenAI-compatible 客户端
+
+### `rag/`
+
+RAG 问答编排模块目录。
+
+当前包含：
+
+- `qa_service.py`：Vector-only RAG 问答服务
+
+#### `qa_service.py`
+
+负责把检索结果组织成 prompt，并调用 LLM 生成答案。
+
+当前包含：
+
+- `SourceEvidence`：答案来源证据结构
+- `QAResult`：问答结果结构
+- `RAGQAService`：检索、构造 prompt、调用 LLM 的完整问答流程
+- `build_rag_prompt`：根据问题和检索文本块构造提示词
 
 ### `vectorstore/`
 
