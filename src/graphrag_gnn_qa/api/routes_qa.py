@@ -43,11 +43,21 @@ class GraphEvidenceResponse(BaseModel):
     confidence: float
 
 
+class CitationEvidenceResponse(BaseModel):
+    evidence_id: str
+    evidence_type: str
+    document_id: str
+    chunk_id: str
+    source: str
+    fusion_score: float
+
+
 class AskResponse(BaseModel):
     question: str
     answer: str
     sources: list[SourceEvidenceResponse]
     graph_sources: list[GraphEvidenceResponse]
+    citations: list[CitationEvidenceResponse]
 
 
 class QAService(Protocol):
@@ -117,4 +127,5 @@ def ask_question(
         answer=result.answer,
         sources=[SourceEvidenceResponse(**source.__dict__) for source in result.sources],
         graph_sources=[GraphEvidenceResponse(**source.__dict__) for source in result.graph_sources],
+        citations=[CitationEvidenceResponse(**citation.__dict__) for citation in result.citations],
     )

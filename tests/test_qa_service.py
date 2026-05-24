@@ -1,6 +1,7 @@
 import pytest
 
 from graphrag_gnn_qa.rag.qa_service import (
+    CitationEvidence,
     GraphEvidence,
     RAGQAService,
     SourceEvidence,
@@ -128,6 +129,16 @@ def test_rag_qa_service_returns_answer_and_sources() -> None:
             content="GraphRAG connects vector search and graph traversal.",
         )
     ]
+    assert result.citations == [
+        CitationEvidence(
+            evidence_id="V1",
+            evidence_type="vector_chunk",
+            document_id="sample",
+            chunk_id="sample_chunk_0000",
+            source="sample.txt",
+            fusion_score=0.944,
+        )
+    ]
 
 
 def test_rag_qa_service_returns_graph_sources() -> None:
@@ -146,6 +157,16 @@ def test_rag_qa_service_returns_graph_sources() -> None:
     assert "evidence_id=V1+G1" in llm_client.prompt
     assert "type=hybrid" in llm_client.prompt
     assert "GraphRAG improves question answering." in llm_client.prompt
+    assert result.citations == [
+        CitationEvidence(
+            evidence_id="V1+G1",
+            evidence_type="hybrid",
+            document_id="sample",
+            chunk_id="sample_chunk_0000",
+            source="sample.txt",
+            fusion_score=0.944,
+        )
+    ]
     assert result.graph_sources == [
         GraphEvidence(
             center_name="GraphRAG",

@@ -282,8 +282,9 @@ POST /qa/ask
 
 - `sources`：Milvus 向量检索召回的文本证据
 - `graph_sources`：Neo4j 图谱检索召回的关系证据
+- `citations`：用于生成答案的混合证据引用，包含 `evidence_id`、`evidence_type`、`document_id`、`chunk_id`、`source` 和 `fusion_score`
 
-问答生成时会先构造去重后的 `hybrid_results`，再使用融合排序后的混合证据上下文调用 LLM；当前响应字段保持兼容。
+问答生成时会先构造去重后的 `hybrid_results`，再使用融合排序后的混合证据上下文调用 LLM；响应保留原有来源字段，并额外返回可解释引用。
 
 图谱召回会先从自然语言问题中抽取候选实体查询词。例如：
 

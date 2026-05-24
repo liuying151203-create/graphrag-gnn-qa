@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from graphrag_gnn_qa.llm.client import LLMClient
@@ -46,11 +46,22 @@ class GraphEvidence:
 
 
 @dataclass(frozen=True)
+class CitationEvidence:
+    evidence_id: str
+    evidence_type: str
+    document_id: str
+    chunk_id: str
+    source: str
+    fusion_score: float
+
+
+@dataclass(frozen=True)
 class QAResult:
     question: str
     answer: str
     sources: list[SourceEvidence]
     graph_sources: list[GraphEvidence]
+    citations: list[CitationEvidence] = field(default_factory=list)
 
 
 class RAGQAService:
@@ -126,11 +137,23 @@ class RAGQAService:
             )
             for relation in graph_relations
         ]
+        citations = [
+            CitationEvidence(
+                evidence_id=evidence.evidence_id,
+                evidence_type=evidence.evidence_type.value,
+                document_id=evidence.document_id,
+                chunk_id=evidence.chunk_id,
+                source=evidence.source,
+                fusion_score=evidence.fusion_score,
+            )
+            for evidence in hybrid_result.evidences
+        ]
         return QAResult(
             question=normalized_question,
             answer=answer,
             sources=sources,
             graph_sources=graph_sources,
+            citations=citations,
         )
 
 

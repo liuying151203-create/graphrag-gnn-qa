@@ -217,7 +217,7 @@ POST /retrieval/debug
 POST /qa/ask
 ```
 
-该接口接收用户问题，检索相关文本块和图谱关系，再调用 LLM 生成答案和来源证据。
+该接口接收用户问题，检索相关文本块和图谱关系，再调用 LLM 生成答案、来源证据和混合证据引用。
 
 ### `ingestion/`
 
@@ -325,6 +325,7 @@ RAG 问答编排模块目录。
 
 - `SourceEvidence`：答案来源证据结构
 - `GraphEvidence`：图谱来源证据结构
+- `CitationEvidence`：答案引用的混合证据结构
 - `QAResult`：问答结果结构
 - `RAGQAService`：检索、调用 Context Builder、调用 LLM 的完整问答流程
 

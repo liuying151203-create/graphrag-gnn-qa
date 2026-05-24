@@ -51,7 +51,7 @@ multipart/form-data
 当前状态：已实现 GraphRAG-aware 版本，问答生成内部使用去重后的 Hybrid Evidence Context。
 
 图谱召回会从自然语言问题中抽取候选实体查询词，例如 `What is GraphRAG?` 会额外使用 `GraphRAG` 查询 Neo4j。
-向量检索结果和图谱检索结果会先转换为去重、融合排序后的混合证据，最终 LLM prompt 由 GraphRAG Context Builder 统一组织。响应中的 `sources` 和 `graph_sources` 保持兼容。
+向量检索结果和图谱检索结果会先转换为去重、融合排序后的混合证据，最终 LLM prompt 由 GraphRAG Context Builder 统一组织。响应中的 `sources` 和 `graph_sources` 保持兼容，并通过 `citations` 返回答案使用的混合证据引用。
 
 请求示例：
 
@@ -92,6 +92,16 @@ multipart/form-data
       "source": "sample.txt",
       "evidence": "GraphRAG improves question answering.",
       "confidence": 0.9
+    }
+  ],
+  "citations": [
+    {
+      "evidence_id": "V1+G1",
+      "evidence_type": "hybrid",
+      "document_id": "sample",
+      "chunk_id": "sample_chunk_0000",
+      "source": "sample.txt",
+      "fusion_score": 0.944
     }
   ]
 }

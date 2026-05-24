@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 
 from graphrag_gnn_qa.api.routes_qa import get_qa_service
 from graphrag_gnn_qa.main import app
-from graphrag_gnn_qa.rag.qa_service import GraphEvidence, QAResult, SourceEvidence
+from graphrag_gnn_qa.rag.qa_service import CitationEvidence, GraphEvidence, QAResult, SourceEvidence
 
 
 class FakeQAService:
@@ -34,6 +34,16 @@ class FakeQAService:
                     source="sample.txt",
                     evidence="GraphRAG improves question answering.",
                     confidence=0.9,
+                )
+            ],
+            citations=[
+                CitationEvidence(
+                    evidence_id="V1+G1",
+                    evidence_type="hybrid",
+                    document_id="sample",
+                    chunk_id="sample_chunk_0000",
+                    source="sample.txt",
+                    fusion_score=0.944,
                 )
             ],
         )
@@ -74,6 +84,16 @@ def test_ask_question() -> None:
                 "source": "sample.txt",
                 "evidence": "GraphRAG improves question answering.",
                 "confidence": 0.9,
+            }
+        ],
+        "citations": [
+            {
+                "evidence_id": "V1+G1",
+                "evidence_type": "hybrid",
+                "document_id": "sample",
+                "chunk_id": "sample_chunk_0000",
+                "source": "sample.txt",
+                "fusion_score": 0.944,
             }
         ],
     }
