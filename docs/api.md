@@ -46,12 +46,12 @@ multipart/form-data
 
 ### `POST /qa/ask`
 
-用于接收用户问题，并返回结合向量检索上下文和图谱关系上下文生成的答案和来源证据。
+用于接收用户问题，并返回结合混合检索证据上下文生成的答案和来源证据。
 
-当前状态：已实现 GraphRAG-aware 版本。
+当前状态：已实现 GraphRAG-aware 版本，问答生成内部使用去重后的 Hybrid Evidence Context。
 
 图谱召回会从自然语言问题中抽取候选实体查询词，例如 `What is GraphRAG?` 会额外使用 `GraphRAG` 查询 Neo4j。
-向量上下文、图谱上下文和最终 LLM prompt 由 GraphRAG Context Builder 统一组织。
+向量检索结果和图谱检索结果会先转换为去重、融合排序后的混合证据，最终 LLM prompt 由 GraphRAG Context Builder 统一组织。响应中的 `sources` 和 `graph_sources` 保持兼容。
 
 请求示例：
 

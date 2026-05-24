@@ -94,7 +94,7 @@ http://localhost:8000/health
 - `POST /graph/retrieve` 图谱检索 API
 - `POST /retrieval/debug` 检索调试 API
 - `POST /qa/ask` GraphRAG-aware 问答 API
-- GraphRAG Context Builder，用于统一组织向量上下文、图谱上下文和 LLM prompt
+- GraphRAG Context Builder，用于统一组织向量上下文、图谱上下文、混合证据上下文和 LLM prompt
 - Hybrid Retrieval Result Model，用于统一表示、融合排序并去重向量证据和图谱证据
 - 基于 LLM 的实体关系抽取脚本
 - Neo4j 图谱节点与关系写入脚本
@@ -282,6 +282,8 @@ POST /qa/ask
 
 - `sources`：Milvus 向量检索召回的文本证据
 - `graph_sources`：Neo4j 图谱检索召回的关系证据
+
+问答生成时会先构造去重后的 `hybrid_results`，再使用融合排序后的混合证据上下文调用 LLM；当前响应字段保持兼容。
 
 图谱召回会先从自然语言问题中抽取候选实体查询词。例如：
 

@@ -2,8 +2,9 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from graphrag_gnn_qa.llm.client import LLMClient
-from graphrag_gnn_qa.rag.context_builder import build_rag_prompt
+from graphrag_gnn_qa.rag.context_builder import build_hybrid_rag_prompt, build_rag_prompt
 from graphrag_gnn_qa.retrieval.graph_retriever import RetrievedGraphRelation
+from graphrag_gnn_qa.retrieval.hybrid_result import build_hybrid_retrieval_result
 from graphrag_gnn_qa.retrieval.query_entities import extract_query_entities
 from graphrag_gnn_qa.retrieval.vector_retriever import RetrievedChunk
 
@@ -87,7 +88,15 @@ class RAGQAService:
                 top_k=self.graph_top_k,
                 max_depth=self.graph_max_depth,
             )
-        prompt = build_rag_prompt(question=normalized_question, chunks=chunks, graph_relations=graph_relations)
+        hybrid_result = build_hybrid_retrieval_result(
+            query=normalized_question,
+            chunks=chunks,
+            graph_relations=graph_relations,
+        )
+        prompt = build_hybrid_rag_prompt(
+            question=normalized_question,
+            hybrid_evidences=hybrid_result.evidences,
+        )
         answer = self.llm_client.generate(prompt)
         sources = [
             SourceEvidence(

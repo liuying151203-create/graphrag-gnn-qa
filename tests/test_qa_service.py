@@ -115,6 +115,8 @@ def test_rag_qa_service_returns_answer_and_sources() -> None:
     assert result.question == "What is GraphRAG?"
     assert result.answer == "GraphRAG combines retrieved text chunks with generation."
     assert "What is GraphRAG?" in llm_client.prompt
+    assert "Hybrid Evidence Context:" in llm_client.prompt
+    assert "evidence_id=V1" in llm_client.prompt
     assert result.graph_sources == []
     assert result.sources == [
         SourceEvidence(
@@ -140,7 +142,10 @@ def test_rag_qa_service_returns_graph_sources() -> None:
 
     result = service.answer(question="What is GraphRAG?", top_k=3)
 
-    assert "Graph Source 1" in llm_client.prompt
+    assert "Hybrid Evidence 1" in llm_client.prompt
+    assert "evidence_id=V1+G1" in llm_client.prompt
+    assert "type=hybrid" in llm_client.prompt
+    assert "GraphRAG improves question answering." in llm_client.prompt
     assert result.graph_sources == [
         GraphEvidence(
             center_name="GraphRAG",

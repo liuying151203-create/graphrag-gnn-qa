@@ -330,15 +330,18 @@ RAG 问答编排模块目录。
 
 #### `context_builder.py`
 
-负责把向量检索结果和图谱检索结果组织成 GraphRAG prompt。
+负责把向量检索结果、图谱检索结果和混合证据组织成 GraphRAG prompt。
 
 当前包含：
 
 - `GraphRAGContext`：结构化上下文结果
+- `HybridRAGContext`：混合证据上下文结果
 - `build_vector_context`：构造向量上下文
 - `build_graph_context`：构造图谱上下文
+- `build_hybrid_context`：构造去重后的混合证据上下文
 - `build_graphrag_context`：组合向量和图谱上下文
 - `build_rag_prompt`：构造最终 LLM prompt
+- `build_hybrid_rag_prompt`：基于混合证据构造最终 LLM prompt
 
 ### `vectorstore/`
 
