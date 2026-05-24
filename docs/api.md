@@ -187,7 +187,7 @@ multipart/form-data
 
 用于展示当前问题的向量召回、图谱查询词、图谱召回结果和统一混合证据，便于调试 GraphRAG 检索效果。
 
-当前状态：已实现 Vector + Graph + Hybrid Evidence 检索调试版本。
+当前状态：已实现 Vector + Graph + Hybrid Evidence 检索调试版本，`hybrid_results` 会包含 `fusion_score` 并按融合分降序返回。
 
 请求示例：
 
@@ -245,6 +245,7 @@ multipart/form-data
       "evidence_type": "vector_chunk",
       "rank": 1,
       "score": 0.91,
+      "fusion_score": 0.937,
       "document_id": "sample",
       "chunk_id": "sample_chunk_0000",
       "source": "sample.txt",
@@ -259,6 +260,7 @@ multipart/form-data
       "evidence_type": "graph_relation",
       "rank": 1,
       "score": 0.9,
+      "fusion_score": 0.93,
       "document_id": "sample",
       "chunk_id": "sample_chunk_0000",
       "source": "sample.txt",

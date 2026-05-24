@@ -95,7 +95,7 @@ http://localhost:8000/health
 - `POST /retrieval/debug` 检索调试 API
 - `POST /qa/ask` GraphRAG-aware 问答 API
 - GraphRAG Context Builder，用于统一组织向量上下文、图谱上下文和 LLM prompt
-- Hybrid Retrieval Result Model，用于统一表示向量证据和图谱证据
+- Hybrid Retrieval Result Model，用于统一表示向量证据和图谱证据，并生成融合排序分数
 - 基于 LLM 的实体关系抽取脚本
 - Neo4j 图谱节点与关系写入脚本
 - 基于 Neo4j 的图谱邻域检索脚本
@@ -259,7 +259,7 @@ POST /retrieval/debug
 - `graph_query_terms`：从问题中生成的图谱查询词
 - `vector_results`：Milvus 文本块召回结果
 - `graph_results`：Neo4j 图谱关系召回结果
-- `hybrid_results`：统一后的混合检索证据，便于后续 rerank、GNN 和引用排序
+- `hybrid_results`：统一后的混合检索证据，包含 `fusion_score`，按融合分降序返回，便于后续 rerank、GNN 和引用排序
 
 问答 API：
 

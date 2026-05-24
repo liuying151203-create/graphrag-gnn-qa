@@ -24,6 +24,7 @@ class HybridEvidenceResponse(BaseModel):
     evidence_type: str
     rank: int
     score: float
+    fusion_score: float
     document_id: str
     chunk_id: str
     source: str
@@ -84,6 +85,7 @@ def debug_retrieval(
                 evidence_type=evidence.evidence_type.value,
                 rank=evidence.rank,
                 score=evidence.score,
+                fusion_score=evidence.fusion_score,
                 document_id=evidence.document_id,
                 chunk_id=evidence.chunk_id,
                 source=evidence.source,
