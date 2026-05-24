@@ -57,6 +57,7 @@ graphrag-gnn-qa/
 │       ├── retrieval/
 │       │   ├── __init__.py
 │       │   ├── graph_retriever.py
+│       │   ├── hybrid_result.py
 │       │   ├── query_entities.py
 │       │   └── vector_retriever.py
 │       └── vectorstore/
@@ -73,6 +74,7 @@ graphrag-gnn-qa/
 │   ├── test_graph_extractor.py
 │   ├── test_graph_api.py
 │   ├── test_graph_retriever.py
+│   ├── test_hybrid_result.py
 │   ├── test_health.py
 │   ├── test_ingest_documents.py
 │   ├── test_load_graph_to_neo4j.py
@@ -376,6 +378,7 @@ RAG 问答编排模块目录。
 
 - `vector_retriever.py`：Vector-only 检索服务
 - `graph_retriever.py`：Graph-only 检索服务
+- `hybrid_result.py`：统一混合检索证据模型
 - `query_entities.py`：查询问题中的候选实体抽取
 
 #### `vector_retriever.py`
@@ -397,6 +400,20 @@ RAG 问答编排模块目录。
 - `GraphSearchStore`：图谱搜索存储接口
 - `RetrievedGraphRelation`：图谱关系检索结果结构
 - `GraphRetriever`：封装 query 规范化、参数校验和图谱邻域检索流程
+
+#### `hybrid_result.py`
+
+负责把向量检索结果和图谱检索结果转换成统一的混合证据结构。
+
+当前包含：
+
+- `EvidenceType`：证据类型枚举，目前包含 `vector_chunk` 和 `graph_relation`
+- `HybridEvidence`：统一证据结构，用于表示文本块证据或图谱关系证据
+- `HybridRetrievalResult`：混合检索结果结构
+- `build_hybrid_evidences`：合并向量证据和图谱证据
+- `build_hybrid_retrieval_result`：构造完整混合检索结果
+
+当前用于 `/retrieval/debug` 返回 `hybrid_results`，为后续 rerank、GNN 和引用排序预留统一输入。
 
 #### `query_entities.py`
 
@@ -631,6 +648,7 @@ graph_triples.jsonl
 - Milvus 导入辅助逻辑
 - Vector-only 检索模块
 - Graph-only 检索模块
+- Hybrid Retrieval Result Model
 - 检索调试 API
 - 图谱检索 API
 - GraphRAG Context Builder

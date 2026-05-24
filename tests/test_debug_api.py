@@ -94,6 +94,44 @@ def test_debug_retrieval_returns_vector_and_graph_results() -> None:
                 "confidence": 0.9,
             }
         ],
+        "hybrid_results": [
+            {
+                "evidence_id": "V1",
+                "evidence_type": "vector_chunk",
+                "rank": 1,
+                "score": 0.91,
+                "document_id": "sample",
+                "chunk_id": "sample_chunk_0000",
+                "source": "sample.txt",
+                "content": "GraphRAG connects vector search and graph traversal.",
+                "metadata": {
+                    "file_name": "sample.txt",
+                    "file_type": "txt",
+                },
+            },
+            {
+                "evidence_id": "G1",
+                "evidence_type": "graph_relation",
+                "rank": 1,
+                "score": 0.9,
+                "document_id": "sample",
+                "chunk_id": "sample_chunk_0000",
+                "source": "sample.txt",
+                "content": "GraphRAG improves question answering.",
+                "metadata": {
+                    "center_id": "Method:graphrag",
+                    "center_name": "GraphRAG",
+                    "center_type": "Method",
+                    "source_id": "Method:graphrag",
+                    "source_name": "GraphRAG",
+                    "source_type": "Method",
+                    "relation_type": "SOLVES_TASK",
+                    "target_id": "Task:question answering",
+                    "target_name": "question answering",
+                    "target_type": "Task",
+                },
+            },
+        ],
     }
 
 

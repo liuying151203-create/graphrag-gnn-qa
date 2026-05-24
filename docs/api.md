@@ -185,9 +185,9 @@ multipart/form-data
 
 ### `POST /retrieval/debug`
 
-用于展示当前问题的向量召回、图谱查询词和图谱召回结果，便于调试 GraphRAG 检索效果。
+用于展示当前问题的向量召回、图谱查询词、图谱召回结果和统一混合证据，便于调试 GraphRAG 检索效果。
 
-当前状态：已实现 Vector + Graph 检索调试版本。
+当前状态：已实现 Vector + Graph + Hybrid Evidence 检索调试版本。
 
 请求示例：
 
@@ -237,6 +237,39 @@ multipart/form-data
       "source": "sample.txt",
       "evidence": "GraphRAG improves question answering.",
       "confidence": 0.9
+    }
+  ],
+  "hybrid_results": [
+    {
+      "evidence_id": "V1",
+      "evidence_type": "vector_chunk",
+      "rank": 1,
+      "score": 0.91,
+      "document_id": "sample",
+      "chunk_id": "sample_chunk_0000",
+      "source": "sample.txt",
+      "content": "GraphRAG connects vector search and graph traversal.",
+      "metadata": {
+        "file_name": "sample.txt",
+        "file_type": "txt"
+      }
+    },
+    {
+      "evidence_id": "G1",
+      "evidence_type": "graph_relation",
+      "rank": 1,
+      "score": 0.9,
+      "document_id": "sample",
+      "chunk_id": "sample_chunk_0000",
+      "source": "sample.txt",
+      "content": "GraphRAG improves question answering.",
+      "metadata": {
+        "center_name": "GraphRAG",
+        "center_type": "Method",
+        "relation_type": "SOLVES_TASK",
+        "target_name": "question answering",
+        "target_type": "Task"
+      }
     }
   ]
 }

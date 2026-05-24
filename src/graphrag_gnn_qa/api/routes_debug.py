@@ -9,6 +9,7 @@ from graphrag_gnn_qa.api.routes_graph import (
 from graphrag_gnn_qa.api.routes_retrieve import Retriever, RetrievedChunkResponse, get_vector_retriever
 from graphrag_gnn_qa.config import get_settings
 from graphrag_gnn_qa.rag.qa_service import build_graph_query_terms, retrieve_graph_relations_for_question
+from graphrag_gnn_qa.retrieval.hybrid_result import build_hybrid_retrieval_result
 
 
 class RetrievalDebugRequest(BaseModel):
@@ -16,6 +17,18 @@ class RetrievalDebugRequest(BaseModel):
     vector_top_k: int | None = Field(default=None, ge=1)
     graph_top_k: int | None = Field(default=None, ge=1)
     graph_max_depth: int | None = Field(default=None, ge=1)
+
+
+class HybridEvidenceResponse(BaseModel):
+    evidence_id: str
+    evidence_type: str
+    rank: int
+    score: float
+    document_id: str
+    chunk_id: str
+    source: str
+    content: str
+    metadata: dict[str, str]
 
 
 class RetrievalDebugResponse(BaseModel):
@@ -26,6 +39,7 @@ class RetrievalDebugResponse(BaseModel):
     graph_query_terms: list[str]
     vector_results: list[RetrievedChunkResponse]
     graph_results: list[RetrievedGraphRelationResponse]
+    hybrid_results: list[HybridEvidenceResponse]
 
 
 router = APIRouter(tags=["retrieval"])
@@ -50,6 +64,11 @@ def debug_retrieval(
         top_k=graph_top_k,
         max_depth=graph_max_depth,
     )
+    hybrid_result = build_hybrid_retrieval_result(
+        query=request.query,
+        chunks=vector_results,
+        graph_relations=graph_results,
+    )
 
     return RetrievalDebugResponse(
         query=request.query,
@@ -59,4 +78,18 @@ def debug_retrieval(
         graph_query_terms=graph_query_terms,
         vector_results=[RetrievedChunkResponse(**chunk.__dict__) for chunk in vector_results],
         graph_results=[RetrievedGraphRelationResponse(**relation.__dict__) for relation in graph_results],
+        hybrid_results=[
+            HybridEvidenceResponse(
+                evidence_id=evidence.evidence_id,
+                evidence_type=evidence.evidence_type.value,
+                rank=evidence.rank,
+                score=evidence.score,
+                document_id=evidence.document_id,
+                chunk_id=evidence.chunk_id,
+                source=evidence.source,
+                content=evidence.content,
+                metadata=evidence.metadata,
+            )
+            for evidence in hybrid_result.evidences
+        ],
     )
