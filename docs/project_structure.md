@@ -407,16 +407,17 @@ RAG 问答编排模块目录。
 
 当前包含：
 
-- `EvidenceType`：证据类型枚举，目前包含 `vector_chunk` 和 `graph_relation`
+- `EvidenceType`：证据类型枚举，目前包含 `vector_chunk`、`graph_relation` 和 `hybrid`
 - `HybridEvidence`：统一证据结构，用于表示文本块证据或图谱关系证据，并携带 `fusion_score`
 - `HybridRetrievalResult`：混合检索结果结构
 - `normalize_scores`：按证据类型对原始分数进行归一化
 - `apply_fusion_scores`：融合原始相关性分数和检索 rank 分数
 - `rank_hybrid_evidences`：按 `fusion_score` 对混合证据降序排序
+- `deduplicate_hybrid_evidences`：按 `document_id + chunk_id` 合并重复证据，并保留来源证据信息
 - `build_hybrid_evidences`：合并向量证据和图谱证据
 - `build_hybrid_retrieval_result`：构造完整混合检索结果
 
-当前用于 `/retrieval/debug` 返回按 `fusion_score` 排序的 `hybrid_results`，为后续 rerank、GNN 和引用排序预留统一输入。
+当前用于 `/retrieval/debug` 返回去重后并按 `fusion_score` 排序的 `hybrid_results`，为后续 rerank、GNN 和引用排序预留统一输入。
 
 #### `query_entities.py`
 

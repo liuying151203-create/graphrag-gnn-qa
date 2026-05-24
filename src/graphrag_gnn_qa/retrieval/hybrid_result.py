@@ -11,6 +11,7 @@ DEFAULT_FUSION_RANK_WEIGHT = 0.3
 class EvidenceType(str, Enum):
     VECTOR_CHUNK = "vector_chunk"
     GRAPH_RELATION = "graph_relation"
+    HYBRID = "hybrid"
 
 
 @dataclass(frozen=True)
@@ -136,6 +137,13 @@ def rank_hybrid_evidences(evidences: list[HybridEvidence]) -> list[HybridEvidenc
     return sorted(evidences, key=lambda evidence: evidence.fusion_score, reverse=True)
 
 
+def deduplicate_hybrid_evidences(evidences: list[HybridEvidence]) -> list[HybridEvidence]:
+    grouped_evidences: dict[tuple[str, str, str], list[HybridEvidence]] = {}
+    for evidence in evidences:
+        grouped_evidences.setdefault(_deduplication_key(evidence), []).append(evidence)
+    return [_merge_hybrid_evidence_group(group) for group in grouped_evidences.values()]
+
+
 def build_hybrid_evidences(
     chunks: list[RetrievedChunk],
     graph_relations: list[RetrievedGraphRelation],
@@ -145,11 +153,82 @@ def build_hybrid_evidences(
         graph_relation_to_hybrid_evidence(relation=relation, rank=index)
         for index, relation in enumerate(graph_relations, start=1)
     ]
-    return rank_hybrid_evidences(apply_fusion_scores(vector_evidences + graph_evidences))
+    ranked_evidences = rank_hybrid_evidences(apply_fusion_scores(vector_evidences + graph_evidences))
+    return rank_hybrid_evidences(deduplicate_hybrid_evidences(ranked_evidences))
 
 
 def _clamp_score(score: float) -> float:
     return max(0.0, min(1.0, score))
+
+
+def _deduplication_key(evidence: HybridEvidence) -> tuple[str, str, str]:
+    if evidence.document_id and evidence.chunk_id:
+        return ("document_chunk", evidence.document_id, evidence.chunk_id)
+    return ("evidence", evidence.evidence_type.value, evidence.evidence_id)
+
+
+def _merge_hybrid_evidence_group(evidences: list[HybridEvidence]) -> HybridEvidence:
+    if len(evidences) == 1:
+        return evidences[0]
+
+    ordered_evidences = sorted(evidences, key=_evidence_merge_sort_key)
+    primary_evidence = _select_primary_evidence(ordered_evidences)
+    evidence_types = list(dict.fromkeys(evidence.evidence_type for evidence in ordered_evidences))
+    evidence_id = "+".join(evidence.evidence_id for evidence in ordered_evidences)
+    content = "\n".join(dict.fromkeys(evidence.content for evidence in [primary_evidence, *ordered_evidences] if evidence.content))
+    return replace(
+        primary_evidence,
+        evidence_id=evidence_id,
+        evidence_type=EvidenceType.HYBRID if len(evidence_types) > 1 else evidence_types[0],
+        rank=min(evidence.rank for evidence in ordered_evidences),
+        score=max(evidence.score for evidence in ordered_evidences),
+        fusion_score=max(evidence.fusion_score for evidence in ordered_evidences),
+        content=content,
+        metadata=_merge_hybrid_metadata(ordered_evidences),
+    )
+
+
+def _select_primary_evidence(evidences: list[HybridEvidence]) -> HybridEvidence:
+    return max(
+        evidences,
+        key=lambda evidence: (
+            evidence.evidence_type == EvidenceType.VECTOR_CHUNK,
+            evidence.fusion_score,
+        ),
+    )
+
+
+def _merge_hybrid_metadata(evidences: list[HybridEvidence]) -> dict[str, str]:
+    metadata: dict[str, str] = {}
+    for evidence in evidences:
+        for key, value in evidence.metadata.items():
+            _append_metadata_value(metadata=metadata, key=key, value=value)
+
+    metadata["evidence_ids"] = ",".join(evidence.evidence_id for evidence in evidences)
+    metadata["evidence_types"] = ",".join(evidence.evidence_type.value for evidence in evidences)
+    metadata["source_evidence_count"] = str(len(evidences))
+    return metadata
+
+
+def _append_metadata_value(metadata: dict[str, str], key: str, value: str) -> None:
+    if key not in metadata:
+        metadata[key] = value
+        return
+    if metadata[key] == value:
+        return
+
+    existing_values = metadata[key].split(" | ")
+    if value not in existing_values:
+        metadata[key] = f"{metadata[key]} | {value}"
+
+
+def _evidence_merge_sort_key(evidence: HybridEvidence) -> tuple[int, int, str]:
+    evidence_type_order = {
+        EvidenceType.VECTOR_CHUNK: 0,
+        EvidenceType.GRAPH_RELATION: 1,
+        EvidenceType.HYBRID: 2,
+    }
+    return (evidence_type_order[evidence.evidence_type], evidence.rank, evidence.evidence_id)
 
 
 def build_hybrid_retrieval_result(

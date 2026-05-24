@@ -7,6 +7,7 @@ from graphrag_gnn_qa.retrieval.hybrid_result import (
     build_hybrid_evidences,
     build_hybrid_retrieval_result,
     chunk_to_hybrid_evidence,
+    deduplicate_hybrid_evidences,
     graph_relation_to_hybrid_evidence,
     normalize_scores,
     rank_hybrid_evidences,
@@ -81,9 +82,12 @@ def test_graph_relation_to_hybrid_evidence() -> None:
 def test_build_hybrid_evidences_combines_vector_and_graph_evidence() -> None:
     evidences = build_hybrid_evidences(chunks=[sample_chunk()], graph_relations=[sample_graph_relation()])
 
-    assert [evidence.evidence_id for evidence in evidences] == ["V1", "G1"]
-    assert [evidence.evidence_type for evidence in evidences] == [EvidenceType.VECTOR_CHUNK, EvidenceType.GRAPH_RELATION]
-    assert [evidence.fusion_score for evidence in evidences] == [0.937, 0.93]
+    assert len(evidences) == 1
+    assert evidences[0].evidence_id == "V1+G1"
+    assert evidences[0].evidence_type == EvidenceType.HYBRID
+    assert evidences[0].fusion_score == 0.937
+    assert evidences[0].metadata["evidence_ids"] == "V1,G1"
+    assert evidences[0].metadata["evidence_types"] == "vector_chunk,graph_relation"
 
 
 def test_normalize_scores_scales_scores_to_zero_one_range() -> None:
@@ -120,6 +124,51 @@ def test_rank_hybrid_evidences_sorts_by_fusion_score_descending() -> None:
     assert [evidence.evidence_id for evidence in ranked_evidences] == ["G1", "V2"]
 
 
+def test_deduplicate_hybrid_evidences_merges_same_document_chunk() -> None:
+    evidences = apply_fusion_scores(
+        [
+            chunk_to_hybrid_evidence(chunk=sample_chunk(), rank=1),
+            graph_relation_to_hybrid_evidence(relation=sample_graph_relation(), rank=1),
+        ]
+    )
+
+    deduplicated_evidences = deduplicate_hybrid_evidences(evidences)
+
+    assert len(deduplicated_evidences) == 1
+    evidence = deduplicated_evidences[0]
+    assert evidence.evidence_id == "V1+G1"
+    assert evidence.evidence_type == EvidenceType.HYBRID
+    assert evidence.rank == 1
+    assert evidence.score == 0.91
+    assert evidence.fusion_score == 0.937
+    assert evidence.content == (
+        "GraphRAG connects vector search and graph traversal.\nGraphRAG improves question answering."
+    )
+    assert evidence.metadata["file_name"] == "sample.txt"
+    assert evidence.metadata["relation_type"] == "SOLVES_TASK"
+    assert evidence.metadata["source_evidence_count"] == "2"
+
+
+def test_deduplicate_hybrid_evidences_keeps_distinct_document_chunks() -> None:
+    chunk = RetrievedChunk(
+        score=0.81,
+        chunk_id="sample_chunk_0001",
+        document_id="sample",
+        content="Graph traversal adds structured evidence.",
+        source="sample.txt",
+        file_name="sample.txt",
+        file_type="txt",
+    )
+    evidences = [
+        chunk_to_hybrid_evidence(chunk=sample_chunk(), rank=1),
+        chunk_to_hybrid_evidence(chunk=chunk, rank=2),
+    ]
+
+    deduplicated_evidences = deduplicate_hybrid_evidences(evidences)
+
+    assert [evidence.evidence_id for evidence in deduplicated_evidences] == ["V1", "V2"]
+
+
 def test_build_hybrid_retrieval_result() -> None:
     result = build_hybrid_retrieval_result(
         query="What is GraphRAG?",
@@ -128,7 +177,7 @@ def test_build_hybrid_retrieval_result() -> None:
     )
 
     assert result.query == "What is GraphRAG?"
-    assert len(result.evidences) == 2
+    assert len(result.evidences) == 1
 
 
 def test_build_hybrid_retrieval_result_rejects_empty_query() -> None:
