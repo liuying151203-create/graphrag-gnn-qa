@@ -52,6 +52,7 @@ graphrag-gnn-qa/
 │       │   └── client.py
 │       ├── rag/
 │       │   ├── __init__.py
+│       │   ├── context_builder.py
 │       │   └── qa_service.py
 │       ├── retrieval/
 │       │   ├── __init__.py
@@ -64,6 +65,7 @@ graphrag-gnn-qa/
 │           └── milvus_client.py
 ├── tests/
 │   ├── test_document_loader.py
+│   ├── test_context_builder.py
 │   ├── test_debug_api.py
 │   ├── test_embed_chunks.py
 │   ├── test_embedding.py
@@ -310,18 +312,31 @@ RAG 问答编排模块目录。
 
 当前包含：
 
-- `qa_service.py`：Vector-only RAG 问答服务
+- `context_builder.py`：GraphRAG 上下文和 prompt 构造模块
+- `qa_service.py`：GraphRAG-aware 问答服务
 
 #### `qa_service.py`
 
-负责把检索结果组织成 prompt，并调用 LLM 生成答案。
+负责编排向量检索、图谱检索和 LLM 调用，返回答案和来源证据。
 
 当前包含：
 
 - `SourceEvidence`：答案来源证据结构
+- `GraphEvidence`：图谱来源证据结构
 - `QAResult`：问答结果结构
-- `RAGQAService`：检索、构造 prompt、调用 LLM 的完整问答流程
-- `build_rag_prompt`：根据问题和检索文本块构造提示词
+- `RAGQAService`：检索、调用 Context Builder、调用 LLM 的完整问答流程
+
+#### `context_builder.py`
+
+负责把向量检索结果和图谱检索结果组织成 GraphRAG prompt。
+
+当前包含：
+
+- `GraphRAGContext`：结构化上下文结果
+- `build_vector_context`：构造向量上下文
+- `build_graph_context`：构造图谱上下文
+- `build_graphrag_context`：组合向量和图谱上下文
+- `build_rag_prompt`：构造最终 LLM prompt
 
 ### `vectorstore/`
 
@@ -618,6 +633,7 @@ graph_triples.jsonl
 - Graph-only 检索模块
 - 检索调试 API
 - 图谱检索 API
+- GraphRAG Context Builder
 - Query entity extraction 模块
 - GraphRAG-aware 问答模块
 - 实体关系抽取模块

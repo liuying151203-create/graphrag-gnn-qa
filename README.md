@@ -94,6 +94,7 @@ http://localhost:8000/health
 - `POST /graph/retrieve` 图谱检索 API
 - `POST /retrieval/debug` 检索调试 API
 - `POST /qa/ask` GraphRAG-aware 问答 API
+- GraphRAG Context Builder，用于统一组织向量上下文、图谱上下文和 LLM prompt
 - 基于 LLM 的实体关系抽取脚本
 - Neo4j 图谱节点与关系写入脚本
 - 基于 Neo4j 的图谱邻域检索脚本
