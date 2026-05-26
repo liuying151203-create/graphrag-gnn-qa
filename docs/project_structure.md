@@ -620,11 +620,11 @@ python scripts/search_graph.py "GraphRAG" --top-k 5 --max-depth 2
 data/eval/questions.sample.jsonl
   -> 调用 /retrieval/debug
   -> 调用 /qa/ask
-  -> 写入 run_config、retrieval_debug、qa 和 summary
+  -> 写入 run_config、retrieval_debug、qa、metrics 和 summary
   -> data/eval/retrieval_eval_results.jsonl
 ```
 
-其中 `run_config` 会记录本次评估的 API 地址、TopK 参数，以及 `/retrieval/debug` 返回的实际 `fusion_weights`，便于复现实验。
+其中 `run_config` 会记录本次评估的 API 地址、TopK 参数，以及 `/retrieval/debug` 返回的实际 `fusion_weights`，便于复现实验；`metrics` 会记录基于期望关键词的检索命中、MRR、citation 命中、答案关键词命中和接口耗时。
 
 运行方式：
 

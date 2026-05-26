@@ -5,6 +5,7 @@ import httpx
 import pytest
 
 from scripts.evaluate_retrieval import (
+    build_metrics,
     build_qa_payload,
     build_retrieval_debug_payload,
     build_run_config,
@@ -94,6 +95,66 @@ def test_build_run_config_records_retrieval_parameters_and_fusion_weights() -> N
     }
 
 
+def test_build_metrics_records_keyword_hits_ranks_and_latency() -> None:
+    metrics = build_metrics(
+        question_record={
+            "expected_evidence_keywords": ["GraphRAG", "retrieval"],
+        },
+        retrieval_debug={
+            "hybrid_results": [
+                {
+                    "evidence_id": "V1",
+                    "content": "Unrelated context.",
+                    "fusion_score": 0.9,
+                },
+                {
+                    "evidence_id": "V2",
+                    "content": "GraphRAG combines graph retrieval and generation.",
+                    "fusion_score": 0.8,
+                },
+            ],
+        },
+        qa={
+            "answer": "GraphRAG improves retrieval quality.",
+            "citations": [{"evidence_id": "V2"}],
+        },
+        retrieval_debug_latency_ms=12.3456,
+        qa_latency_ms=20.1111,
+    )
+
+    assert metrics == {
+        "retrieval": {
+            "expected_evidence_keyword_count": 2,
+            "matched_evidence_keywords": ["graphrag", "retrieval"],
+            "matched_evidence_keyword_count": 2,
+            "evidence_keyword_recall": 1.0,
+            "retrieval_hit": True,
+            "recall_at_k": 1.0,
+            "first_relevant_rank": 2,
+            "mrr": 0.5,
+            "top_hybrid_keyword_hit": False,
+        },
+        "citations": {
+            "citation_keyword_hit": True,
+            "matched_citation_keywords": ["graphrag", "retrieval"],
+            "matched_citation_keyword_count": 2,
+        },
+        "answer": {
+            "answer_keyword_source": "expected_evidence_keywords",
+            "expected_answer_keyword_count": 2,
+            "matched_answer_keywords": ["graphrag", "retrieval"],
+            "matched_answer_keyword_count": 2,
+            "answer_keyword_recall": 1.0,
+            "answer_keyword_hit": True,
+        },
+        "latency": {
+            "retrieval_debug_ms": 12.346,
+            "qa_ms": 20.111,
+            "total_ms": 32.457,
+        },
+    }
+
+
 def test_evaluate_questions_writes_jsonl_output(tmp_path: Path) -> None:
     input_file = tmp_path / "questions.jsonl"
     output_file = tmp_path / "results.jsonl"
@@ -104,6 +165,7 @@ def test_evaluate_questions_writes_jsonl_output(tmp_path: Path) -> None:
                 "question": "What is GraphRAG?",
                 "expected_answer": "GraphRAG combines retrieval and generation.",
                 "expected_evidence_keywords": ["GraphRAG"],
+                "expected_answer_keywords": ["generation"],
             }
         )
         + "\n",
@@ -120,7 +182,13 @@ def test_evaluate_questions_writes_jsonl_output(tmp_path: Path) -> None:
                     "fusion_weights": {"score_weight": 0.7, "rank_weight": 0.3},
                     "vector_results": [{"chunk_id": "sample_chunk_0000"}],
                     "graph_results": [],
-                    "hybrid_results": [{"evidence_id": "V1", "fusion_score": 0.944}],
+                    "hybrid_results": [
+                        {
+                            "evidence_id": "V1",
+                            "fusion_score": 0.944,
+                            "content": "GraphRAG retrieval evidence.",
+                        }
+                    ],
                 },
             )
         if request.url.path == "/qa/ask":
@@ -152,6 +220,7 @@ def test_evaluate_questions_writes_jsonl_output(tmp_path: Path) -> None:
     assert records[0]["question"] == "What is GraphRAG?"
     assert records[0]["expected_answer"] == "GraphRAG combines retrieval and generation."
     assert records[0]["expected_evidence_keywords"] == ["GraphRAG"]
+    assert records[0]["expected_answer_keywords"] == ["generation"]
     assert records[0]["run_config"] == {
         "base_url": "http://testserver",
         "vector_top_k": 3,
@@ -168,6 +237,34 @@ def test_evaluate_questions_writes_jsonl_output(tmp_path: Path) -> None:
         "top_hybrid_evidence_id": "V1",
         "top_hybrid_fusion_score": 0.944,
     }
+    assert records[0]["metrics"]["retrieval"] == {
+        "expected_evidence_keyword_count": 1,
+        "matched_evidence_keywords": ["graphrag"],
+        "matched_evidence_keyword_count": 1,
+        "evidence_keyword_recall": 1.0,
+        "retrieval_hit": True,
+        "recall_at_k": 1.0,
+        "first_relevant_rank": 1,
+        "mrr": 1.0,
+        "top_hybrid_keyword_hit": True,
+    }
+    assert records[0]["metrics"]["citations"] == {
+        "citation_keyword_hit": True,
+        "matched_citation_keywords": ["graphrag"],
+        "matched_citation_keyword_count": 1,
+    }
+    assert records[0]["metrics"]["answer"] == {
+        "answer_keyword_source": "expected_answer_keywords",
+        "expected_answer_keyword_count": 1,
+        "matched_answer_keywords": ["generation"],
+        "matched_answer_keyword_count": 1,
+        "answer_keyword_recall": 1.0,
+        "answer_keyword_hit": True,
+    }
+    assert set(records[0]["metrics"]["latency"]) == {"retrieval_debug_ms", "qa_ms", "total_ms"}
+    assert records[0]["metrics"]["latency"]["retrieval_debug_ms"] >= 0
+    assert records[0]["metrics"]["latency"]["qa_ms"] >= 0
+    assert records[0]["metrics"]["latency"]["total_ms"] >= 0
 
 
 def test_parse_args_for_evaluate_retrieval(monkeypatch) -> None:

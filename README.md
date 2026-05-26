@@ -332,6 +332,7 @@ data/eval/retrieval_eval_results.jsonl
 - `run_config`：本次评估使用的 API 地址、TopK 参数和 fusion 权重
 - `retrieval_debug`：`/retrieval/debug` 的完整响应
 - `qa`：`/qa/ask` 的完整响应，包含 `citations`
+- `metrics`：基于期望关键词的检索、引用、答案和延迟指标
 - `summary`：召回数量、引用数量和 Top hybrid evidence 摘要
 
 ### 抽取实体关系

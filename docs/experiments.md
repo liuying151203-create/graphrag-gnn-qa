@@ -63,7 +63,7 @@
 
 ## 评估记录脚本
 
-当前提供 `scripts/evaluate_retrieval.py`，用于批量调用 `/retrieval/debug` 和 `/qa/ask`，把检索结果、答案和 citations 写入 JSONL。
+当前提供 `scripts/evaluate_retrieval.py`，用于批量调用 `/retrieval/debug` 和 `/qa/ask`，把检索结果、答案、citations 和自动评估指标写入 JSONL。
 
 样例问题集：
 
@@ -88,7 +88,27 @@ data/eval/retrieval_eval_results.jsonl
 - `run_config`：本次评估使用的 API 地址、TopK 参数和实际 fusion 权重
 - `retrieval_debug`：向量、图谱和混合检索结果
 - `qa`：问答结果和 `citations`
+- `metrics`：基于期望关键词的检索、引用、答案和延迟指标
 - `summary`：召回数量、引用数量和 Top hybrid evidence 摘要
+
+问题集中的每条记录可包含：
+
+- `expected_evidence_keywords`：期望在检索证据中命中的关键词
+- `expected_answer_keywords`：期望在答案中命中的关键词；如果省略，则复用 `expected_evidence_keywords`
+
+当前自动指标包括：
+
+- `metrics.retrieval.evidence_keyword_recall`：混合检索结果覆盖期望证据关键词的比例
+- `metrics.retrieval.retrieval_hit`：TopK 混合检索结果中是否至少命中一个期望证据关键词
+- `metrics.retrieval.first_relevant_rank`：第一个关键词命中的混合证据 rank
+- `metrics.retrieval.mrr`：基于 `first_relevant_rank` 计算的 reciprocal rank
+- `metrics.retrieval.top_hybrid_keyword_hit`：Top1 混合证据是否命中期望证据关键词
+- `metrics.citations.citation_keyword_hit`：答案 citations 指向的证据是否命中期望证据关键词
+- `metrics.answer.answer_keyword_recall`：答案覆盖期望答案关键词的比例
+- `metrics.answer.answer_keyword_hit`：答案是否至少命中一个期望答案关键词
+- `metrics.latency.total_ms`：`/retrieval/debug` 和 `/qa/ask` 两次调用的总耗时
+
+这些指标是轻量关键词指标，适合当前小规模 dev set 的链路验证和配置对比；正式实验仍需要更大问题集和人工或模型辅助评测。
 
 评估不同融合策略时，可以在 `.env` 中调整：
 
