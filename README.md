@@ -33,6 +33,7 @@
 - [知识图谱 Schema 设计](docs/graph_schema.md)
 - [实验设计](docs/experiments.md)
 - [项目结构说明](docs/project_structure.md)
+- [项目开发工作流与个人偏好](docs/development_workflow.md)
 
 ## 本地运行
 

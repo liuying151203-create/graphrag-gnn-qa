@@ -18,6 +18,7 @@ graphrag-gnn-qa/
 ├── docs/
 │   ├── api.md
 │   ├── architecture.md
+│   ├── development_workflow.md
 │   ├── experiments.md
 │   ├── graph_schema.md
 │   └── project_structure.md
@@ -675,8 +676,9 @@ graph_triples.jsonl
 
 当前包含：
 
-- `architecture.md`：系统架构设计
 - `api.md`：API 设计
+- `architecture.md`：系统架构设计
+- `development_workflow.md`：项目开发工作流与个人偏好
 - `graph_schema.md`：知识图谱 Schema 设计
 - `experiments.md`：实验设计
 - `project_structure.md`：项目结构说明
