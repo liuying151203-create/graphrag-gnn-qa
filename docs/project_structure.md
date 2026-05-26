@@ -7,6 +7,8 @@
 ```text
 graphrag-gnn-qa/
 ├── data/
+│   ├── eval/
+│   │   └── questions.sample.jsonl
 │   ├── raw/
 │   │   └── .gitkeep
 │   ├── processed/
@@ -21,6 +23,7 @@ graphrag-gnn-qa/
 │   └── project_structure.md
 ├── scripts/
 │   ├── embed_chunks.py
+│   ├── evaluate_retrieval.py
 │   ├── extract_graph.py
 │   ├── ingest_documents.py
 │   ├── load_graph_to_neo4j.py
@@ -70,6 +73,7 @@ graphrag-gnn-qa/
 │   ├── test_debug_api.py
 │   ├── test_embed_chunks.py
 │   ├── test_embedding.py
+│   ├── test_evaluate_retrieval.py
 │   ├── test_extract_graph.py
 │   ├── test_graph_extractor.py
 │   ├── test_graph_api.py
@@ -604,9 +608,41 @@ python scripts/search_chunks.py "What is GraphRAG?" --top-k 3
 python scripts/search_graph.py "GraphRAG" --top-k 5 --max-depth 2
 ```
 
+### `evaluate_retrieval.py`
+
+当前已经实现的检索与问答评估记录脚本。
+
+默认流程：
+
+```text
+data/eval/questions.sample.jsonl
+  -> 调用 /retrieval/debug
+  -> 调用 /qa/ask
+  -> 写入 retrieval_debug、qa 和 summary
+  -> data/eval/retrieval_eval_results.jsonl
+```
+
+运行方式：
+
+```powershell
+python scripts/evaluate_retrieval.py --vector-top-k 3 --graph-top-k 5 --graph-max-depth 2 --qa-top-k 3
+```
+
 ## `data/`
 
 数据目录。
+
+### `data/eval/`
+
+存放检索与问答评估问题集和评估结果。
+
+当前包含：
+
+```text
+questions.sample.jsonl
+```
+
+`retrieval_eval_results.jsonl` 是脚本运行生成的评估结果文件。
 
 ### `data/raw/`
 
@@ -662,6 +698,7 @@ graph_triples.jsonl
 - GraphRAG Context Builder
 - Query entity extraction 模块
 - GraphRAG-aware 问答模块
+- 检索与问答评估记录脚本
 - 实体关系抽取模块
 - Neo4j 图谱写入模块
 
@@ -695,8 +732,10 @@ python -m pytest
   -> Milvus collection
   -> search_chunks.py
   -> TopK RetrievedChunk 列表
+  -> retrieval/debug
+  -> hybrid_results
   -> RAGQAService
-  -> answer + sources
+  -> answer + sources + graph_sources + citations
   -> extract_graph.py
   -> graph_triples.jsonl
   -> load_graph_to_neo4j.py

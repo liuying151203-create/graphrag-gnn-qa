@@ -1,0 +1,2 @@
+{"id": "q0001", "question": "What is GraphRAG?", "expected_answer": "GraphRAG combines graph-based retrieval with text generation.", "expected_evidence_keywords": ["GraphRAG", "retrieval"]}
+{"id": "q0002", "question": "How does GraphRAG improve question answering?", "expected_answer": "GraphRAG improves question answering by combining vector context and graph relations.", "expected_evidence_keywords": ["question answering", "graph"]}

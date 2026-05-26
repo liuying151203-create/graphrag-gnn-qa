@@ -61,6 +61,34 @@
 
 衡量端到端响应延迟。
 
+## 评估记录脚本
+
+当前提供 `scripts/evaluate_retrieval.py`，用于批量调用 `/retrieval/debug` 和 `/qa/ask`，把检索结果、答案和 citations 写入 JSONL。
+
+样例问题集：
+
+```text
+data/eval/questions.sample.jsonl
+```
+
+运行方式：
+
+```powershell
+python scripts/evaluate_retrieval.py --vector-top-k 3 --graph-top-k 5 --graph-max-depth 2 --qa-top-k 3
+```
+
+默认输出：
+
+```text
+data/eval/retrieval_eval_results.jsonl
+```
+
+每条输出记录包含：
+
+- `retrieval_debug`：向量、图谱和混合检索结果
+- `qa`：问答结果和 `citations`
+- `summary`：召回数量、引用数量和 Top hybrid evidence 摘要
+
 ## 结果记录模板
 
 | 方法 | 多跳准确率 | Recall@5 | MRR | 平均延迟 |

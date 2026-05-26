@@ -96,6 +96,7 @@ http://localhost:8000/health
 - `POST /qa/ask` GraphRAG-aware 问答 API
 - GraphRAG Context Builder，用于统一组织向量上下文、图谱上下文、混合证据上下文和 LLM prompt
 - Hybrid Retrieval Result Model，用于统一表示、融合排序并去重向量证据和图谱证据
+- 检索与问答评估脚本，用于批量记录 `/retrieval/debug`、`/qa/ask` 和 `citations`
 - 基于 LLM 的实体关系抽取脚本
 - Neo4j 图谱节点与关系写入脚本
 - 基于 Neo4j 的图谱邻域检索脚本
@@ -294,6 +295,32 @@ What is GraphRAG?
 ```
 
 这样可以避免完整问句直接匹配 Neo4j 节点名导致 `graph_sources` 为空。
+
+### 检索与问答评估
+
+启动 API 服务后，可以用样例问题集批量记录检索结果、答案和引用：
+
+```powershell
+python scripts/evaluate_retrieval.py --vector-top-k 3 --graph-top-k 5 --graph-max-depth 2 --qa-top-k 3
+```
+
+默认输入：
+
+```text
+data/eval/questions.sample.jsonl
+```
+
+默认输出：
+
+```text
+data/eval/retrieval_eval_results.jsonl
+```
+
+输出 JSONL 每行包含：
+
+- `retrieval_debug`：`/retrieval/debug` 的完整响应
+- `qa`：`/qa/ask` 的完整响应，包含 `citations`
+- `summary`：召回数量、引用数量和 Top hybrid evidence 摘要
 
 ### 抽取实体关系
 
