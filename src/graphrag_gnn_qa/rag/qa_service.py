@@ -1,10 +1,14 @@
 from dataclasses import dataclass, field
 from typing import Protocol
 
+from graphrag_gnn_qa.config import DEFAULT_FUSION_RANK_WEIGHT, DEFAULT_FUSION_SCORE_WEIGHT
 from graphrag_gnn_qa.llm.client import LLMClient
 from graphrag_gnn_qa.rag.context_builder import build_hybrid_rag_prompt, build_rag_prompt
 from graphrag_gnn_qa.retrieval.graph_retriever import RetrievedGraphRelation
-from graphrag_gnn_qa.retrieval.hybrid_result import build_hybrid_retrieval_result
+from graphrag_gnn_qa.retrieval.hybrid_result import (
+    build_hybrid_retrieval_result,
+    validate_fusion_weights,
+)
 from graphrag_gnn_qa.retrieval.query_entities import extract_query_entities
 from graphrag_gnn_qa.retrieval.vector_retriever import RetrievedChunk
 
@@ -72,16 +76,21 @@ class RAGQAService:
         graph_retriever: GraphRelationRetriever | None = None,
         graph_top_k: int = 5,
         graph_max_depth: int = 1,
+        fusion_score_weight: float = DEFAULT_FUSION_SCORE_WEIGHT,
+        fusion_rank_weight: float = DEFAULT_FUSION_RANK_WEIGHT,
     ) -> None:
         if graph_top_k <= 0:
             raise ValueError("graph_top_k must be greater than 0")
         if graph_max_depth <= 0:
             raise ValueError("graph_max_depth must be greater than 0")
+        validate_fusion_weights(score_weight=fusion_score_weight, rank_weight=fusion_rank_weight)
         self.retriever = retriever
         self.llm_client = llm_client
         self.graph_retriever = graph_retriever
         self.graph_top_k = graph_top_k
         self.graph_max_depth = graph_max_depth
+        self.fusion_score_weight = fusion_score_weight
+        self.fusion_rank_weight = fusion_rank_weight
 
     def answer(self, question: str, top_k: int = 5) -> QAResult:
         normalized_question = question.strip()
@@ -103,6 +112,8 @@ class RAGQAService:
             query=normalized_question,
             chunks=chunks,
             graph_relations=graph_relations,
+            score_weight=self.fusion_score_weight,
+            rank_weight=self.fusion_rank_weight,
         )
         prompt = build_hybrid_rag_prompt(
             question=normalized_question,

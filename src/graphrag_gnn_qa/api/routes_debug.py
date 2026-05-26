@@ -32,11 +32,17 @@ class HybridEvidenceResponse(BaseModel):
     metadata: dict[str, str]
 
 
+class FusionWeightsResponse(BaseModel):
+    score_weight: float
+    rank_weight: float
+
+
 class RetrievalDebugResponse(BaseModel):
     query: str
     vector_top_k: int
     graph_top_k: int
     graph_max_depth: int
+    fusion_weights: FusionWeightsResponse
     graph_query_terms: list[str]
     vector_results: list[RetrievedChunkResponse]
     graph_results: list[RetrievedGraphRelationResponse]
@@ -69,6 +75,8 @@ def debug_retrieval(
         query=request.query,
         chunks=vector_results,
         graph_relations=graph_results,
+        score_weight=settings.fusion_score_weight,
+        rank_weight=settings.fusion_rank_weight,
     )
 
     return RetrievalDebugResponse(
@@ -76,6 +84,10 @@ def debug_retrieval(
         vector_top_k=vector_top_k,
         graph_top_k=graph_top_k,
         graph_max_depth=graph_max_depth,
+        fusion_weights=FusionWeightsResponse(
+            score_weight=settings.fusion_score_weight,
+            rank_weight=settings.fusion_rank_weight,
+        ),
         graph_query_terms=graph_query_terms,
         vector_results=[RetrievedChunkResponse(**chunk.__dict__) for chunk in vector_results],
         graph_results=[RetrievedGraphRelationResponse(**relation.__dict__) for relation in graph_results],

@@ -69,6 +69,24 @@ def build_summary(retrieval_debug: dict[str, Any], qa: dict[str, Any]) -> dict[s
     }
 
 
+def build_run_config(
+    base_url: str,
+    vector_top_k: int | None = None,
+    graph_top_k: int | None = None,
+    graph_max_depth: int | None = None,
+    qa_top_k: int | None = None,
+    fusion_weights: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return {
+        "base_url": base_url,
+        "vector_top_k": vector_top_k,
+        "graph_top_k": graph_top_k,
+        "graph_max_depth": graph_max_depth,
+        "qa_top_k": qa_top_k,
+        "fusion_weights": fusion_weights,
+    }
+
+
 def evaluate_questions(
     input_file: Path,
     output_file: Path,
@@ -110,6 +128,14 @@ def evaluate_questions(
                     "question": question,
                     "expected_answer": question_record.get("expected_answer"),
                     "expected_evidence_keywords": question_record.get("expected_evidence_keywords", []),
+                    "run_config": build_run_config(
+                        base_url=base_url,
+                        vector_top_k=vector_top_k,
+                        graph_top_k=graph_top_k,
+                        graph_max_depth=graph_max_depth,
+                        qa_top_k=qa_top_k,
+                        fusion_weights=retrieval_debug.get("fusion_weights"),
+                    ),
                     "retrieval_debug": retrieval_debug,
                     "qa": qa,
                     "summary": build_summary(retrieval_debug=retrieval_debug, qa=qa),

@@ -1,5 +1,6 @@
 import pytest
 
+from graphrag_gnn_qa.config import DEFAULT_FUSION_RANK_WEIGHT, DEFAULT_FUSION_SCORE_WEIGHT
 from graphrag_gnn_qa.retrieval.graph_retriever import RetrievedGraphRelation
 from graphrag_gnn_qa.retrieval.hybrid_result import (
     EvidenceType,
@@ -80,7 +81,12 @@ def test_graph_relation_to_hybrid_evidence() -> None:
 
 
 def test_build_hybrid_evidences_combines_vector_and_graph_evidence() -> None:
-    evidences = build_hybrid_evidences(chunks=[sample_chunk()], graph_relations=[sample_graph_relation()])
+    evidences = build_hybrid_evidences(
+        chunks=[sample_chunk()],
+        graph_relations=[sample_graph_relation()],
+        score_weight=DEFAULT_FUSION_SCORE_WEIGHT,
+        rank_weight=DEFAULT_FUSION_RANK_WEIGHT,
+    )
 
     assert len(evidences) == 1
     assert evidences[0].evidence_id == "V1+G1"
@@ -106,7 +112,11 @@ def test_apply_fusion_scores_combines_normalized_score_and_rank_score() -> None:
         graph_relation_to_hybrid_evidence(relation=sample_graph_relation(), rank=1),
     ]
 
-    fused_evidences = apply_fusion_scores(evidences=evidences)
+    fused_evidences = apply_fusion_scores(
+        evidences=evidences,
+        score_weight=DEFAULT_FUSION_SCORE_WEIGHT,
+        rank_weight=DEFAULT_FUSION_RANK_WEIGHT,
+    )
 
     assert [evidence.fusion_score for evidence in fused_evidences] == [0.787, 0.93]
 
@@ -116,7 +126,9 @@ def test_rank_hybrid_evidences_sorts_by_fusion_score_descending() -> None:
         [
             chunk_to_hybrid_evidence(chunk=sample_chunk(), rank=2),
             graph_relation_to_hybrid_evidence(relation=sample_graph_relation(), rank=1),
-        ]
+        ],
+        score_weight=DEFAULT_FUSION_SCORE_WEIGHT,
+        rank_weight=DEFAULT_FUSION_RANK_WEIGHT,
     )
 
     ranked_evidences = rank_hybrid_evidences(evidences)
@@ -129,7 +141,9 @@ def test_deduplicate_hybrid_evidences_merges_same_document_chunk() -> None:
         [
             chunk_to_hybrid_evidence(chunk=sample_chunk(), rank=1),
             graph_relation_to_hybrid_evidence(relation=sample_graph_relation(), rank=1),
-        ]
+        ],
+        score_weight=DEFAULT_FUSION_SCORE_WEIGHT,
+        rank_weight=DEFAULT_FUSION_RANK_WEIGHT,
     )
 
     deduplicated_evidences = deduplicate_hybrid_evidences(evidences)
@@ -174,15 +188,35 @@ def test_build_hybrid_retrieval_result() -> None:
         query="What is GraphRAG?",
         chunks=[sample_chunk()],
         graph_relations=[sample_graph_relation()],
+        score_weight=DEFAULT_FUSION_SCORE_WEIGHT,
+        rank_weight=DEFAULT_FUSION_RANK_WEIGHT,
     )
 
     assert result.query == "What is GraphRAG?"
     assert len(result.evidences) == 1
 
 
+def test_build_hybrid_retrieval_result_uses_custom_fusion_weights() -> None:
+    result = build_hybrid_retrieval_result(
+        query="What is GraphRAG?",
+        chunks=[sample_chunk()],
+        graph_relations=[sample_graph_relation()],
+        score_weight=1,
+        rank_weight=0,
+    )
+
+    assert result.evidences[0].fusion_score == 0.91
+
+
 def test_build_hybrid_retrieval_result_rejects_empty_query() -> None:
     with pytest.raises(ValueError):
-        build_hybrid_retrieval_result(query="   ", chunks=[], graph_relations=[])
+        build_hybrid_retrieval_result(
+            query="   ",
+            chunks=[],
+            graph_relations=[],
+            score_weight=DEFAULT_FUSION_SCORE_WEIGHT,
+            rank_weight=DEFAULT_FUSION_RANK_WEIGHT,
+        )
 
 
 def test_hybrid_evidence_rejects_invalid_rank() -> None:
@@ -196,8 +230,8 @@ def test_apply_fusion_scores_rejects_invalid_weights() -> None:
     evidences = [chunk_to_hybrid_evidence(chunk=sample_chunk(), rank=1)]
 
     with pytest.raises(ValueError):
-        apply_fusion_scores(evidences=evidences, score_weight=-1)
+        apply_fusion_scores(evidences=evidences, score_weight=-1, rank_weight=DEFAULT_FUSION_RANK_WEIGHT)
     with pytest.raises(ValueError):
-        apply_fusion_scores(evidences=evidences, rank_weight=-1)
+        apply_fusion_scores(evidences=evidences, score_weight=DEFAULT_FUSION_SCORE_WEIGHT, rank_weight=-1)
     with pytest.raises(ValueError):
         apply_fusion_scores(evidences=evidences, score_weight=0, rank_weight=0)

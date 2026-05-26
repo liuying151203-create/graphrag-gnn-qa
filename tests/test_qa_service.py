@@ -185,6 +185,20 @@ def test_rag_qa_service_returns_graph_sources() -> None:
     ]
 
 
+def test_rag_qa_service_uses_custom_fusion_weights() -> None:
+    service = RAGQAService(
+        retriever=FakeRetriever(),
+        llm_client=FakeLLMClient(),
+        graph_retriever=FakeGraphRetriever(),
+        fusion_score_weight=1,
+        fusion_rank_weight=0,
+    )
+
+    result = service.answer(question="What is GraphRAG?", top_k=3)
+
+    assert result.citations[0].fusion_score == 0.92
+
+
 def test_build_graph_query_terms_extracts_entities_from_question() -> None:
     assert build_graph_query_terms("What is GraphRAG?") == ["What is GraphRAG?", "GraphRAG"]
 

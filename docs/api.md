@@ -51,7 +51,7 @@ multipart/form-data
 当前状态：已实现 GraphRAG-aware 版本，问答生成内部使用去重后的 Hybrid Evidence Context。
 
 图谱召回会从自然语言问题中抽取候选实体查询词，例如 `What is GraphRAG?` 会额外使用 `GraphRAG` 查询 Neo4j。
-向量检索结果和图谱检索结果会先转换为去重、融合排序后的混合证据，最终 LLM prompt 由 GraphRAG Context Builder 统一组织。响应中的 `sources` 和 `graph_sources` 保持兼容，并通过 `citations` 返回答案使用的混合证据引用。
+向量检索结果和图谱检索结果会先转换为去重、融合排序后的混合证据，最终 LLM prompt 由 GraphRAG Context Builder 统一组织。融合排序使用 `.env` 中的 `FUSION_SCORE_WEIGHT` 和 `FUSION_RANK_WEIGHT`，响应中的 `sources` 和 `graph_sources` 保持兼容，并通过 `citations` 返回答案使用的混合证据引用。
 
 请求示例：
 
@@ -218,6 +218,10 @@ multipart/form-data
   "vector_top_k": 3,
   "graph_top_k": 5,
   "graph_max_depth": 2,
+  "fusion_weights": {
+    "score_weight": 0.7,
+    "rank_weight": 0.3
+  },
   "graph_query_terms": ["What is GraphRAG?", "GraphRAG"],
   "vector_results": [
     {
@@ -276,3 +280,5 @@ multipart/form-data
   ]
 }
 ```
+
+`fusion_weights` 表示本次请求实际使用的混合检索融合权重，可用于复现实验结果；`score_weight` 越高越依赖原始相关性分数，`rank_weight` 越高越依赖检索排名分。

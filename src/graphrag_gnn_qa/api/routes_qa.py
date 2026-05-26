@@ -100,6 +100,8 @@ def get_qa_service() -> QAService:
             graph_retriever=graph_retriever,
             graph_top_k=settings.graph_top_k,
             graph_max_depth=settings.graph_max_depth,
+            fusion_score_weight=settings.fusion_score_weight,
+            fusion_rank_weight=settings.fusion_rank_weight,
         )
     except HTTPException:
         raise

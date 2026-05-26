@@ -85,9 +85,21 @@ data/eval/retrieval_eval_results.jsonl
 
 每条输出记录包含：
 
+- `run_config`：本次评估使用的 API 地址、TopK 参数和实际 fusion 权重
 - `retrieval_debug`：向量、图谱和混合检索结果
 - `qa`：问答结果和 `citations`
 - `summary`：召回数量、引用数量和 Top hybrid evidence 摘要
+
+评估不同融合策略时，可以在 `.env` 中调整：
+
+```env
+FUSION_SCORE_WEIGHT=0.7
+FUSION_RANK_WEIGHT=0.3
+```
+
+`FUSION_SCORE_WEIGHT` 越高，排序越依赖原始相关性分数；`FUSION_RANK_WEIGHT` 越高，排序越依赖检索 rank。
+
+评估输出会从 `/retrieval/debug` 的 `fusion_weights` 读取实际生效权重并写入 `run_config`，方便对比不同 `.env` 配置下的结果。
 
 ## 结果记录模板
 

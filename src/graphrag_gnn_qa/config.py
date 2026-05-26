@@ -1,6 +1,10 @@
 from functools import lru_cache
 
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+DEFAULT_FUSION_SCORE_WEIGHT = 0.7
+DEFAULT_FUSION_RANK_WEIGHT = 0.3
 
 
 class Settings(BaseSettings):
@@ -33,8 +37,16 @@ class Settings(BaseSettings):
     graph_top_k: int = 8
     rerank_top_k: int = 5
     graph_max_depth: int = 2
+    fusion_score_weight: float = Field(default=DEFAULT_FUSION_SCORE_WEIGHT, ge=0)
+    fusion_rank_weight: float = Field(default=DEFAULT_FUSION_RANK_WEIGHT, ge=0)
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    @model_validator(mode="after")
+    def validate_fusion_weights(self) -> "Settings":
+        if self.fusion_score_weight + self.fusion_rank_weight <= 0:
+            raise ValueError("fusion_score_weight and fusion_rank_weight must not both be zero")
+        return self
 
 
 @lru_cache

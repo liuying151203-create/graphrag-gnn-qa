@@ -7,6 +7,7 @@ import pytest
 from scripts.evaluate_retrieval import (
     build_qa_payload,
     build_retrieval_debug_payload,
+    build_run_config,
     build_summary,
     evaluate_questions,
     parse_args,
@@ -73,6 +74,26 @@ def test_build_summary_counts_results_and_top_hybrid() -> None:
     }
 
 
+def test_build_run_config_records_retrieval_parameters_and_fusion_weights() -> None:
+    run_config = build_run_config(
+        base_url="http://testserver",
+        vector_top_k=3,
+        graph_top_k=5,
+        graph_max_depth=2,
+        qa_top_k=3,
+        fusion_weights={"score_weight": 0.7, "rank_weight": 0.3},
+    )
+
+    assert run_config == {
+        "base_url": "http://testserver",
+        "vector_top_k": 3,
+        "graph_top_k": 5,
+        "graph_max_depth": 2,
+        "qa_top_k": 3,
+        "fusion_weights": {"score_weight": 0.7, "rank_weight": 0.3},
+    }
+
+
 def test_evaluate_questions_writes_jsonl_output(tmp_path: Path) -> None:
     input_file = tmp_path / "questions.jsonl"
     output_file = tmp_path / "results.jsonl"
@@ -96,6 +117,7 @@ def test_evaluate_questions_writes_jsonl_output(tmp_path: Path) -> None:
                 200,
                 json={
                     "query": "What is GraphRAG?",
+                    "fusion_weights": {"score_weight": 0.7, "rank_weight": 0.3},
                     "vector_results": [{"chunk_id": "sample_chunk_0000"}],
                     "graph_results": [],
                     "hybrid_results": [{"evidence_id": "V1", "fusion_score": 0.944}],
@@ -130,6 +152,14 @@ def test_evaluate_questions_writes_jsonl_output(tmp_path: Path) -> None:
     assert records[0]["question"] == "What is GraphRAG?"
     assert records[0]["expected_answer"] == "GraphRAG combines retrieval and generation."
     assert records[0]["expected_evidence_keywords"] == ["GraphRAG"]
+    assert records[0]["run_config"] == {
+        "base_url": "http://testserver",
+        "vector_top_k": 3,
+        "graph_top_k": None,
+        "graph_max_depth": None,
+        "qa_top_k": 3,
+        "fusion_weights": {"score_weight": 0.7, "rank_weight": 0.3},
+    }
     assert records[0]["summary"] == {
         "vector_result_count": 1,
         "graph_result_count": 0,

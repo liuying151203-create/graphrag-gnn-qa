@@ -1,3 +1,4 @@
+from graphrag_gnn_qa.config import DEFAULT_FUSION_RANK_WEIGHT, DEFAULT_FUSION_SCORE_WEIGHT
 from graphrag_gnn_qa.rag.context_builder import (
     GRAPH_EMPTY_CONTEXT,
     HYBRID_EMPTY_CONTEXT,
@@ -80,7 +81,12 @@ def test_build_hybrid_context_returns_empty_message_without_evidence() -> None:
 
 
 def test_build_hybrid_context_formats_hybrid_evidence() -> None:
-    evidences = build_hybrid_evidences(chunks=[sample_chunk()], graph_relations=[sample_graph_relation()])
+    evidences = build_hybrid_evidences(
+        chunks=[sample_chunk()],
+        graph_relations=[sample_graph_relation()],
+        score_weight=DEFAULT_FUSION_SCORE_WEIGHT,
+        rank_weight=DEFAULT_FUSION_RANK_WEIGHT,
+    )
 
     context = build_hybrid_context(evidences)
 
@@ -100,7 +106,12 @@ def test_build_graphrag_context_combines_vector_and_graph_context() -> None:
 
 
 def test_build_hybrid_rag_prompt_contains_hybrid_context() -> None:
-    evidences = build_hybrid_evidences(chunks=[sample_chunk()], graph_relations=[sample_graph_relation()])
+    evidences = build_hybrid_evidences(
+        chunks=[sample_chunk()],
+        graph_relations=[sample_graph_relation()],
+        score_weight=DEFAULT_FUSION_SCORE_WEIGHT,
+        rank_weight=DEFAULT_FUSION_RANK_WEIGHT,
+    )
 
     prompt = build_hybrid_rag_prompt(question="What is GraphRAG?", hybrid_evidences=evidences)
 

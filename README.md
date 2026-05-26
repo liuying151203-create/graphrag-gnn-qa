@@ -260,7 +260,17 @@ POST /retrieval/debug
 - `graph_query_terms`：从问题中生成的图谱查询词
 - `vector_results`：Milvus 文本块召回结果
 - `graph_results`：Neo4j 图谱关系召回结果
+- `fusion_weights`：本次请求实际使用的融合权重，便于复现实验配置
 - `hybrid_results`：统一后的混合检索证据，包含 `fusion_score`，会按 `document_id + chunk_id` 合并重复证据，并按融合分降序返回，便于后续 rerank、GNN 和引用排序
+
+`fusion_score` 默认由相关性分数和 rank 分数融合得到，可在 `.env` 中调整：
+
+```env
+FUSION_SCORE_WEIGHT=0.7
+FUSION_RANK_WEIGHT=0.3
+```
+
+这两个权重会同时影响 `/retrieval/debug` 的 `hybrid_results` 和 `/qa/ask` 的 `citations` 排序。
 
 问答 API：
 
@@ -318,6 +328,7 @@ data/eval/retrieval_eval_results.jsonl
 
 输出 JSONL 每行包含：
 
+- `run_config`：本次评估使用的 API 地址、TopK 参数和 fusion 权重
 - `retrieval_debug`：`/retrieval/debug` 的完整响应
 - `qa`：`/qa/ask` 的完整响应，包含 `citations`
 - `summary`：召回数量、引用数量和 Top hybrid evidence 摘要

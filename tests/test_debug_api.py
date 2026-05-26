@@ -63,6 +63,10 @@ def test_debug_retrieval_returns_vector_and_graph_results() -> None:
         "vector_top_k": 3,
         "graph_top_k": 5,
         "graph_max_depth": 2,
+        "fusion_weights": {
+            "score_weight": 0.7,
+            "rank_weight": 0.3,
+        },
         "graph_query_terms": ["What is GraphRAG?", "GraphRAG"],
         "vector_results": [
             {
@@ -125,6 +129,27 @@ def test_debug_retrieval_returns_vector_and_graph_results() -> None:
             },
         ],
     }
+
+
+def test_debug_retrieval_uses_configured_fusion_weights(monkeypatch) -> None:
+    class FakeSettings:
+        vector_top_k = 3
+        graph_top_k = 5
+        graph_max_depth = 2
+        fusion_score_weight = 1
+        fusion_rank_weight = 0
+
+    monkeypatch.setattr("graphrag_gnn_qa.api.routes_debug.get_settings", lambda: FakeSettings())
+    app.dependency_overrides[get_vector_retriever] = lambda: FakeVectorRetriever()
+    app.dependency_overrides[get_graph_retriever] = lambda: FakeGraphRetriever()
+    client = TestClient(app)
+
+    response = client.post("/retrieval/debug", json={"query": "What is GraphRAG?"})
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    assert response.json()["fusion_weights"] == {"score_weight": 1.0, "rank_weight": 0.0}
+    assert response.json()["hybrid_results"][0]["fusion_score"] == 0.91
 
 
 def test_debug_retrieval_rejects_invalid_vector_top_k() -> None:

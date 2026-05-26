@@ -4,9 +4,6 @@ from enum import Enum
 from graphrag_gnn_qa.retrieval.graph_retriever import RetrievedGraphRelation
 from graphrag_gnn_qa.retrieval.vector_retriever import RetrievedChunk
 
-DEFAULT_FUSION_SCORE_WEIGHT = 0.7
-DEFAULT_FUSION_RANK_WEIGHT = 0.3
-
 
 class EvidenceType(str, Enum):
     VECTOR_CHUNK = "vector_chunk"
@@ -98,15 +95,10 @@ def normalize_scores(scores: list[float]) -> list[float]:
 
 def apply_fusion_scores(
     evidences: list[HybridEvidence],
-    score_weight: float = DEFAULT_FUSION_SCORE_WEIGHT,
-    rank_weight: float = DEFAULT_FUSION_RANK_WEIGHT,
+    score_weight: float,
+    rank_weight: float,
 ) -> list[HybridEvidence]:
-    if score_weight < 0:
-        raise ValueError("score_weight must not be negative")
-    if rank_weight < 0:
-        raise ValueError("rank_weight must not be negative")
-    if score_weight + rank_weight <= 0:
-        raise ValueError("score_weight and rank_weight must not both be zero")
+    validate_fusion_weights(score_weight=score_weight, rank_weight=rank_weight)
 
     normalized_scores_by_index: dict[int, float] = {}
     for evidence_type in EvidenceType:
@@ -137,6 +129,15 @@ def rank_hybrid_evidences(evidences: list[HybridEvidence]) -> list[HybridEvidenc
     return sorted(evidences, key=lambda evidence: evidence.fusion_score, reverse=True)
 
 
+def validate_fusion_weights(score_weight: float, rank_weight: float) -> None:
+    if score_weight < 0:
+        raise ValueError("score_weight must not be negative")
+    if rank_weight < 0:
+        raise ValueError("rank_weight must not be negative")
+    if score_weight + rank_weight <= 0:
+        raise ValueError("score_weight and rank_weight must not both be zero")
+
+
 def deduplicate_hybrid_evidences(evidences: list[HybridEvidence]) -> list[HybridEvidence]:
     grouped_evidences: dict[tuple[str, str, str], list[HybridEvidence]] = {}
     for evidence in evidences:
@@ -147,13 +148,21 @@ def deduplicate_hybrid_evidences(evidences: list[HybridEvidence]) -> list[Hybrid
 def build_hybrid_evidences(
     chunks: list[RetrievedChunk],
     graph_relations: list[RetrievedGraphRelation],
+    score_weight: float,
+    rank_weight: float,
 ) -> list[HybridEvidence]:
     vector_evidences = [chunk_to_hybrid_evidence(chunk=chunk, rank=index) for index, chunk in enumerate(chunks, start=1)]
     graph_evidences = [
         graph_relation_to_hybrid_evidence(relation=relation, rank=index)
         for index, relation in enumerate(graph_relations, start=1)
     ]
-    ranked_evidences = rank_hybrid_evidences(apply_fusion_scores(vector_evidences + graph_evidences))
+    ranked_evidences = rank_hybrid_evidences(
+        apply_fusion_scores(
+            vector_evidences + graph_evidences,
+            score_weight=score_weight,
+            rank_weight=rank_weight,
+        )
+    )
     return rank_hybrid_evidences(deduplicate_hybrid_evidences(ranked_evidences))
 
 
@@ -235,11 +244,18 @@ def build_hybrid_retrieval_result(
     query: str,
     chunks: list[RetrievedChunk],
     graph_relations: list[RetrievedGraphRelation],
+    score_weight: float,
+    rank_weight: float,
 ) -> HybridRetrievalResult:
     normalized_query = query.strip()
     if not normalized_query:
         raise ValueError("query must not be empty")
     return HybridRetrievalResult(
         query=normalized_query,
-        evidences=build_hybrid_evidences(chunks=chunks, graph_relations=graph_relations),
+        evidences=build_hybrid_evidences(
+            chunks=chunks,
+            graph_relations=graph_relations,
+            score_weight=score_weight,
+            rank_weight=rank_weight,
+        ),
     )

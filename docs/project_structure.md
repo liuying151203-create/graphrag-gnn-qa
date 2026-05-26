@@ -151,7 +151,7 @@ POST /qa/ask
 
 配置管理模块，基于 `pydantic-settings` 从 `.env` 读取配置。
 
-后续 Neo4j、Milvus、LLM、Embedding 和检索参数都会统一从这里读取。
+Neo4j、Milvus、LLM、Embedding、TopK 和 hybrid fusion 权重等参数都会统一从这里读取。
 
 ### `api/`
 
@@ -420,12 +420,13 @@ RAG 问答编排模块目录。
 - `HybridRetrievalResult`：混合检索结果结构
 - `normalize_scores`：按证据类型对原始分数进行归一化
 - `apply_fusion_scores`：融合原始相关性分数和检索 rank 分数
+- `validate_fusion_weights`：校验融合权重
 - `rank_hybrid_evidences`：按 `fusion_score` 对混合证据降序排序
 - `deduplicate_hybrid_evidences`：按 `document_id + chunk_id` 合并重复证据，并保留来源证据信息
 - `build_hybrid_evidences`：合并向量证据和图谱证据
 - `build_hybrid_retrieval_result`：构造完整混合检索结果
 
-当前用于 `/retrieval/debug` 返回去重后并按 `fusion_score` 排序的 `hybrid_results`，为后续 rerank、GNN 和引用排序预留统一输入。
+当前用于 `/retrieval/debug` 返回去重后并按 `fusion_score` 排序的 `hybrid_results`，为后续 rerank、GNN 和引用排序预留统一输入。融合权重由 `.env` 中的 `FUSION_SCORE_WEIGHT` 和 `FUSION_RANK_WEIGHT` 配置。
 
 #### `query_entities.py`
 
@@ -618,9 +619,11 @@ python scripts/search_graph.py "GraphRAG" --top-k 5 --max-depth 2
 data/eval/questions.sample.jsonl
   -> 调用 /retrieval/debug
   -> 调用 /qa/ask
-  -> 写入 retrieval_debug、qa 和 summary
+  -> 写入 run_config、retrieval_debug、qa 和 summary
   -> data/eval/retrieval_eval_results.jsonl
 ```
+
+其中 `run_config` 会记录本次评估的 API 地址、TopK 参数，以及 `/retrieval/debug` 返回的实际 `fusion_weights`，便于复现实验。
 
 运行方式：
 
