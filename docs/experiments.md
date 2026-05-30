@@ -65,16 +65,28 @@
 
 当前提供 `scripts/evaluate_retrieval.py`，用于批量调用 `/retrieval/debug` 和 `/qa/ask`，把检索结果、答案、citations 和自动评估指标写入 JSONL。
 
-样例问题集：
+样例问题集用于快速 smoke test：
 
 ```text
 data/eval/questions.sample.jsonl
+```
+
+小规模 dev set 用于当前阶段的指标验证和配置对比：
+
+```text
+data/eval/questions.dev.jsonl
 ```
 
 运行方式：
 
 ```powershell
 python scripts/evaluate_retrieval.py --vector-top-k 3 --graph-top-k 5 --graph-max-depth 2 --qa-top-k 3
+```
+
+使用 dev set：
+
+```powershell
+python scripts/evaluate_retrieval.py --input-file data/eval/questions.dev.jsonl --vector-top-k 3 --graph-top-k 5 --graph-max-depth 2 --qa-top-k 3
 ```
 
 默认输出：
@@ -108,7 +120,7 @@ data/eval/retrieval_eval_results.jsonl
 - `metrics.answer.answer_keyword_hit`：答案是否至少命中一个期望答案关键词
 - `metrics.latency.total_ms`：`/retrieval/debug` 和 `/qa/ask` 两次调用的总耗时
 
-这些指标是轻量关键词指标，适合当前小规模 dev set 的链路验证和配置对比；正式实验仍需要更大问题集和人工或模型辅助评测。
+这些指标是轻量关键词指标，适合当前小规模 dev set 的链路验证和配置对比；正式实验仍需要更大问题集和人工或模型辅助评测。当前 `questions.dev.jsonl` 基于 `data/raw/sample.txt`、`chunks.jsonl` 和 `graph_triples.jsonl` 构造，重点覆盖信息碎片、vector-only retrieval、knowledge graph、graph traversal、GNN、GraphRAG 关系和证据类型等概念。
 
 评估不同融合策略时，可以在 `.env` 中调整：
 
