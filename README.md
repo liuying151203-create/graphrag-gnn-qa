@@ -325,15 +325,18 @@ data/eval/questions.sample.jsonl
 
 ```text
 data/eval/retrieval_eval_results.jsonl
+data/eval/retrieval_eval_summary.json
 ```
 
-输出 JSONL 每行包含：
+`retrieval_eval_results.jsonl` 每行包含：
 
 - `run_config`：本次评估使用的 API 地址、TopK 参数和 fusion 权重
 - `retrieval_debug`：`/retrieval/debug` 的完整响应
 - `qa`：`/qa/ask` 的完整响应，包含 `citations`
 - `metrics`：基于期望关键词的检索、引用、答案和延迟指标
 - `summary`：召回数量、引用数量和 Top hybrid evidence 摘要
+
+`retrieval_eval_summary.json` 会汇总本次运行的题目数、平均 evidence keyword recall、Recall@K、MRR、citation hit rate、answer hit rate 和平均延迟，便于快速对比不同 TopK 或 fusion 权重配置。
 
 ### 抽取实体关系
 

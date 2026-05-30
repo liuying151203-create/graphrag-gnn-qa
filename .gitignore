@@ -32,6 +32,7 @@ data/raw/*
 data/processed/*
 !data/processed/.gitkeep
 data/eval/retrieval_eval_results.jsonl
+data/eval/retrieval_eval_summary.json
 data/tmp/*
 !data/tmp/.gitkeep
 outputs/

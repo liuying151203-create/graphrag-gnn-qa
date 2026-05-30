@@ -625,9 +625,10 @@ data/eval/questions.sample.jsonl
   -> 调用 /qa/ask
   -> 写入 run_config、retrieval_debug、qa、metrics 和 summary
   -> data/eval/retrieval_eval_results.jsonl
+  -> data/eval/retrieval_eval_summary.json
 ```
 
-其中 `run_config` 会记录本次评估的 API 地址、TopK 参数，以及 `/retrieval/debug` 返回的实际 `fusion_weights`，便于复现实验；`metrics` 会记录基于期望关键词的检索命中、MRR、citation 命中、答案关键词命中和接口耗时。
+其中 `run_config` 会记录本次评估的 API 地址、TopK 参数，以及 `/retrieval/debug` 返回的实际 `fusion_weights`，便于复现实验；`metrics` 会记录基于期望关键词的检索命中、MRR、citation 命中、答案关键词命中和接口耗时；`retrieval_eval_summary.json` 会汇总本次运行的平均指标，便于快速对比不同配置。
 
 运行方式：
 
@@ -650,7 +651,7 @@ questions.sample.jsonl
 questions.dev.jsonl
 ```
 
-`questions.sample.jsonl` 用于快速 smoke test，`questions.dev.jsonl` 用于当前阶段的小规模指标验证和配置对比。`retrieval_eval_results.jsonl` 是脚本运行生成的评估结果文件。
+`questions.sample.jsonl` 用于快速 smoke test，`questions.dev.jsonl` 用于当前阶段的小规模指标验证和配置对比。`retrieval_eval_results.jsonl` 和 `retrieval_eval_summary.json` 是脚本运行生成的评估结果文件。
 
 ### `data/raw/`
 
@@ -760,7 +761,7 @@ python -m pytest
 ```text
 questions.dev.jsonl
   -> evaluate_retrieval.py
-  -> retrieval_debug + qa + metrics + summary
+  -> retrieval_debug + qa + per-question metrics + aggregate summary
   -> 可复现实验记录和结果对比
 ```
 

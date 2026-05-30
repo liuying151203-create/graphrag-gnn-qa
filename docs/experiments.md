@@ -93,15 +93,18 @@ python scripts/evaluate_retrieval.py --input-file data/eval/questions.dev.jsonl 
 
 ```text
 data/eval/retrieval_eval_results.jsonl
+data/eval/retrieval_eval_summary.json
 ```
 
-每条输出记录包含：
+`retrieval_eval_results.jsonl` 每条记录包含：
 
 - `run_config`：本次评估使用的 API 地址、TopK 参数和实际 fusion 权重
 - `retrieval_debug`：向量、图谱和混合检索结果
 - `qa`：问答结果和 `citations`
 - `metrics`：基于期望关键词的检索、引用、答案和延迟指标
 - `summary`：召回数量、引用数量和 Top hybrid evidence 摘要
+
+`retrieval_eval_summary.json` 汇总本次运行的整体指标，包含题目数、运行配置、平均 evidence keyword recall、Recall@K、MRR、Top1 evidence hit rate、citation hit rate、answer hit rate 和平均延迟，用于快速比较不同检索配置。
 
 问题集中的每条记录可包含：
 
@@ -119,6 +122,8 @@ data/eval/retrieval_eval_results.jsonl
 - `metrics.answer.answer_keyword_recall`：答案覆盖期望答案关键词的比例
 - `metrics.answer.answer_keyword_hit`：答案是否至少命中一个期望答案关键词
 - `metrics.latency.total_ms`：`/retrieval/debug` 和 `/qa/ask` 两次调用的总耗时
+
+聚合摘要中的指标由逐题 `metrics` 平均得到；缺失或不适用的指标会被跳过，整组都不可用时返回 `null`。
 
 这些指标是轻量关键词指标，适合当前小规模 dev set 的链路验证和配置对比；正式实验仍需要更大问题集和人工或模型辅助评测。当前 `questions.dev.jsonl` 基于 `data/raw/sample.txt`、`chunks.jsonl` 和 `graph_triples.jsonl` 构造，重点覆盖信息碎片、vector-only retrieval、knowledge graph、graph traversal、GNN、GraphRAG 关系和证据类型等概念。
 

@@ -254,6 +254,52 @@ def build_summary(retrieval_debug: dict[str, Any], qa: dict[str, Any]) -> dict[s
     }
 
 
+def average_metric(records: list[EvaluationRecord], path: list[str]) -> float | None:
+    values = []
+    for record in records:
+        value: Any = record
+        for key in path:
+            if not isinstance(value, dict) or key not in value:
+                value = None
+                break
+            value = value[key]
+        if isinstance(value, bool):
+            values.append(1.0 if value else 0.0)
+        elif isinstance(value, int | float):
+            values.append(float(value))
+
+    if not values:
+        return None
+    return round(sum(values) / len(values), 4)
+
+
+def build_aggregate_summary(records: list[EvaluationRecord], run_config: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "question_count": len(records),
+        "run_config": run_config,
+        "metrics": {
+            "retrieval": {
+                "avg_evidence_keyword_recall": average_metric(records, ["metrics", "retrieval", "evidence_keyword_recall"]),
+                "recall_at_k": average_metric(records, ["metrics", "retrieval", "recall_at_k"]),
+                "mrr": average_metric(records, ["metrics", "retrieval", "mrr"]),
+                "top_hybrid_keyword_hit_rate": average_metric(records, ["metrics", "retrieval", "top_hybrid_keyword_hit"]),
+            },
+            "citations": {
+                "citation_keyword_hit_rate": average_metric(records, ["metrics", "citations", "citation_keyword_hit"]),
+            },
+            "answer": {
+                "avg_answer_keyword_recall": average_metric(records, ["metrics", "answer", "answer_keyword_recall"]),
+                "answer_keyword_hit_rate": average_metric(records, ["metrics", "answer", "answer_keyword_hit"]),
+            },
+            "latency": {
+                "avg_retrieval_debug_ms": average_metric(records, ["metrics", "latency", "retrieval_debug_ms"]),
+                "avg_qa_ms": average_metric(records, ["metrics", "latency", "qa_ms"]),
+                "avg_total_ms": average_metric(records, ["metrics", "latency", "total_ms"]),
+            },
+        },
+    }
+
+
 def build_run_config(
     base_url: str,
     vector_top_k: int | None = None,
@@ -282,9 +328,13 @@ def evaluate_questions(
     qa_top_k: int | None = None,
     timeout: float = 60.0,
     transport: httpx.BaseTransport | None = None,
+    summary_file: Path | None = Path("data/eval/retrieval_eval_summary.json"),
 ) -> int:
     question_records = read_question_records(input_file)
     output_file.parent.mkdir(parents=True, exist_ok=True)
+
+    evaluation_records: list[EvaluationRecord] = []
+    last_run_config: dict[str, Any] | None = None
 
     with httpx.Client(base_url=base_url, timeout=timeout, transport=transport) as client:
         with output_file.open("w", encoding="utf-8") as writer:
@@ -308,20 +358,21 @@ def evaluate_questions(
                     payload=build_qa_payload(question=question, top_k=qa_top_k),
                 )
 
+                run_config = build_run_config(
+                    base_url=base_url,
+                    vector_top_k=vector_top_k,
+                    graph_top_k=graph_top_k,
+                    graph_max_depth=graph_max_depth,
+                    qa_top_k=qa_top_k,
+                    fusion_weights=retrieval_debug.get("fusion_weights"),
+                )
                 evaluation_record: EvaluationRecord = {
                     "id": question_id,
                     "question": question,
                     "expected_answer": question_record.get("expected_answer"),
                     "expected_evidence_keywords": question_record.get("expected_evidence_keywords", []),
                     "expected_answer_keywords": question_record.get("expected_answer_keywords", []),
-                    "run_config": build_run_config(
-                        base_url=base_url,
-                        vector_top_k=vector_top_k,
-                        graph_top_k=graph_top_k,
-                        graph_max_depth=graph_max_depth,
-                        qa_top_k=qa_top_k,
-                        fusion_weights=retrieval_debug.get("fusion_weights"),
-                    ),
+                    "run_config": run_config,
                     "retrieval_debug": retrieval_debug,
                     "qa": qa,
                     "metrics": build_metrics(
@@ -334,6 +385,24 @@ def evaluate_questions(
                     "summary": build_summary(retrieval_debug=retrieval_debug, qa=qa),
                 }
                 writer.write(json.dumps(evaluation_record, ensure_ascii=False) + "\n")
+                evaluation_records.append(evaluation_record)
+                last_run_config = run_config
+
+    if summary_file is not None:
+        summary_file.parent.mkdir(parents=True, exist_ok=True)
+        aggregate_summary = build_aggregate_summary(
+            records=evaluation_records,
+            run_config=last_run_config
+            or build_run_config(
+                base_url=base_url,
+                vector_top_k=vector_top_k,
+                graph_top_k=graph_top_k,
+                graph_max_depth=graph_max_depth,
+                qa_top_k=qa_top_k,
+                fusion_weights=None,
+            ),
+        )
+        summary_file.write_text(json.dumps(aggregate_summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     return len(question_records)
 
@@ -342,6 +411,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate retrieval debug results and QA citations for question JSONL records.")
     parser.add_argument("--input-file", type=Path, default=Path("data/eval/questions.sample.jsonl"))
     parser.add_argument("--output-file", type=Path, default=Path("data/eval/retrieval_eval_results.jsonl"))
+    parser.add_argument("--summary-file", type=Path, default=Path("data/eval/retrieval_eval_summary.json"))
     parser.add_argument("--base-url", type=str, default="http://127.0.0.1:8000")
     parser.add_argument("--vector-top-k", type=int, default=None)
     parser.add_argument("--graph-top-k", type=int, default=None)
@@ -356,6 +426,7 @@ def main() -> None:
     evaluated_count = evaluate_questions(
         input_file=args.input_file,
         output_file=args.output_file,
+        summary_file=args.summary_file,
         base_url=args.base_url,
         vector_top_k=args.vector_top_k,
         graph_top_k=args.graph_top_k,
@@ -364,6 +435,8 @@ def main() -> None:
         timeout=args.timeout,
     )
     print(f"Evaluated {evaluated_count} questions: {args.output_file}")
+    if args.summary_file is not None:
+        print(f"Wrote summary: {args.summary_file}")
 
 
 if __name__ == "__main__":

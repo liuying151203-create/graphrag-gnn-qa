@@ -5,6 +5,8 @@ import httpx
 import pytest
 
 from scripts.evaluate_retrieval import (
+    average_metric,
+    build_aggregate_summary,
     build_metrics,
     build_qa_payload,
     build_retrieval_debug_payload,
@@ -72,6 +74,74 @@ def test_build_summary_counts_results_and_top_hybrid() -> None:
         "citation_count": 1,
         "top_hybrid_evidence_id": "V1+G1",
         "top_hybrid_fusion_score": 0.9,
+    }
+
+
+def test_average_metric_ignores_missing_and_none_values() -> None:
+    records = [
+        {"metrics": {"retrieval": {"mrr": 1.0, "retrieval_hit": True}}},
+        {"metrics": {"retrieval": {"mrr": None, "retrieval_hit": False}}},
+        {"metrics": {"retrieval": {}}},
+    ]
+
+    assert average_metric(records, ["metrics", "retrieval", "mrr"]) == 1.0
+    assert average_metric(records, ["metrics", "retrieval", "retrieval_hit"]) == 0.5
+    assert average_metric(records, ["metrics", "answer", "answer_keyword_recall"]) is None
+
+
+def test_build_aggregate_summary_averages_key_metrics() -> None:
+    records = [
+        {
+            "metrics": {
+                "retrieval": {
+                    "evidence_keyword_recall": 1.0,
+                    "recall_at_k": 1.0,
+                    "mrr": 1.0,
+                    "top_hybrid_keyword_hit": True,
+                },
+                "citations": {"citation_keyword_hit": True},
+                "answer": {"answer_keyword_recall": 0.5, "answer_keyword_hit": True},
+                "latency": {"retrieval_debug_ms": 10.0, "qa_ms": 20.0, "total_ms": 30.0},
+            }
+        },
+        {
+            "metrics": {
+                "retrieval": {
+                    "evidence_keyword_recall": 0.5,
+                    "recall_at_k": 0.0,
+                    "mrr": 0.0,
+                    "top_hybrid_keyword_hit": False,
+                },
+                "citations": {"citation_keyword_hit": False},
+                "answer": {"answer_keyword_recall": 1.0, "answer_keyword_hit": True},
+                "latency": {"retrieval_debug_ms": 30.0, "qa_ms": 40.0, "total_ms": 70.0},
+            }
+        },
+    ]
+
+    summary = build_aggregate_summary(records, run_config={"base_url": "http://testserver"})
+
+    assert summary == {
+        "question_count": 2,
+        "run_config": {"base_url": "http://testserver"},
+        "metrics": {
+            "retrieval": {
+                "avg_evidence_keyword_recall": 0.75,
+                "recall_at_k": 0.5,
+                "mrr": 0.5,
+                "top_hybrid_keyword_hit_rate": 0.5,
+            },
+            "citations": {"citation_keyword_hit_rate": 0.5},
+            "answer": {
+                "avg_answer_keyword_recall": 0.75,
+                "answer_keyword_hit_rate": 1.0,
+            },
+            "latency": {
+                "avg_retrieval_debug_ms": 20.0,
+                "avg_qa_ms": 30.0,
+                "avg_total_ms": 50.0,
+            },
+        },
     }
 
 
@@ -158,6 +228,7 @@ def test_build_metrics_records_keyword_hits_ranks_and_latency() -> None:
 def test_evaluate_questions_writes_jsonl_output(tmp_path: Path) -> None:
     input_file = tmp_path / "questions.jsonl"
     output_file = tmp_path / "results.jsonl"
+    summary_file = tmp_path / "summary.json"
     input_file.write_text(
         json.dumps(
             {
@@ -208,6 +279,7 @@ def test_evaluate_questions_writes_jsonl_output(tmp_path: Path) -> None:
     evaluated_count = evaluate_questions(
         input_file=input_file,
         output_file=output_file,
+        summary_file=summary_file,
         base_url="http://testserver",
         vector_top_k=3,
         qa_top_k=3,
@@ -215,6 +287,7 @@ def test_evaluate_questions_writes_jsonl_output(tmp_path: Path) -> None:
     )
 
     records = [json.loads(line) for line in output_file.read_text(encoding="utf-8").splitlines()]
+    summary = json.loads(summary_file.read_text(encoding="utf-8"))
     assert evaluated_count == 1
     assert records[0]["id"] == "q1"
     assert records[0]["question"] == "What is GraphRAG?"
@@ -265,6 +338,20 @@ def test_evaluate_questions_writes_jsonl_output(tmp_path: Path) -> None:
     assert records[0]["metrics"]["latency"]["retrieval_debug_ms"] >= 0
     assert records[0]["metrics"]["latency"]["qa_ms"] >= 0
     assert records[0]["metrics"]["latency"]["total_ms"] >= 0
+    assert summary["question_count"] == 1
+    assert summary["run_config"] == records[0]["run_config"]
+    assert summary["metrics"]["retrieval"] == {
+        "avg_evidence_keyword_recall": 1.0,
+        "recall_at_k": 1.0,
+        "mrr": 1.0,
+        "top_hybrid_keyword_hit_rate": 1.0,
+    }
+    assert summary["metrics"]["citations"] == {"citation_keyword_hit_rate": 1.0}
+    assert summary["metrics"]["answer"] == {
+        "avg_answer_keyword_recall": 1.0,
+        "answer_keyword_hit_rate": 1.0,
+    }
+    assert set(summary["metrics"]["latency"]) == {"avg_retrieval_debug_ms", "avg_qa_ms", "avg_total_ms"}
 
 
 def test_parse_args_for_evaluate_retrieval(monkeypatch) -> None:
@@ -276,6 +363,8 @@ def test_parse_args_for_evaluate_retrieval(monkeypatch) -> None:
             "data/eval/questions.jsonl",
             "--output-file",
             "data/eval/results.jsonl",
+            "--summary-file",
+            "data/eval/summary.json",
             "--base-url",
             "http://localhost:8000",
             "--vector-top-k",
@@ -295,6 +384,7 @@ def test_parse_args_for_evaluate_retrieval(monkeypatch) -> None:
 
     assert args.input_file == Path("data/eval/questions.jsonl")
     assert args.output_file == Path("data/eval/results.jsonl")
+    assert args.summary_file == Path("data/eval/summary.json")
     assert args.base_url == "http://localhost:8000"
     assert args.vector_top_k == 3
     assert args.graph_top_k == 5
