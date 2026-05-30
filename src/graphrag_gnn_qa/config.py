@@ -22,12 +22,12 @@ class Settings(BaseSettings):
     embedding_model: str = "BAAI/bge-m3"
     reranker_model: str = "BAAI/bge-reranker-v2-m3"
 
-    neo4j_uri: str = "bolt://localhost:7687"
+    neo4j_uri: str = "bolt://127.0.0.1:7687"
     neo4j_username: str = "neo4j"
     neo4j_password: str = "graphrag_neo4j_password"
     neo4j_database: str = "neo4j"
 
-    milvus_host: str = "localhost"
+    milvus_host: str = "127.0.0.1"
     milvus_port: int = 19530
     milvus_db_name: str = "default"
     milvus_chunk_collection: str = "rag_chunks"

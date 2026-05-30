@@ -51,6 +51,28 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
+### 开发者日常启动流程
+
+启动 Neo4j、Milvus、etcd 和 MinIO：
+
+```powershell
+docker compose up -d neo4j etcd minio milvus
+```
+
+运行测试：
+
+```powershell
+python -m pytest
+```
+
+启动后端服务：
+
+```powershell
+uvicorn graphrag_gnn_qa.main:app --app-dir src --reload
+```
+
+如果希望把模型或 pip 缓存放到指定目录，可以在当前终端手动设置 `PIP_CACHE_DIR`、`HF_HOME` 和 `TORCH_HOME`。这属于本机开发偏好，不是运行项目的必要步骤。
+
 ### 创建本地环境变量文件
 
 ```powershell

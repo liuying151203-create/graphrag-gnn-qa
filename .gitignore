@@ -27,6 +27,7 @@ env/
 Thumbs.db
 
 # Data and generated artifacts
+.docker-data/
 data/raw/*
 !data/raw/.gitkeep
 data/processed/*
@@ -44,6 +45,7 @@ models/
 logs/
 
 # Test and cache
+.cache/
 .pytest_cache/
 .coverage
 htmlcov/
