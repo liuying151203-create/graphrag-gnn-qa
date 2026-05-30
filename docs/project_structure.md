@@ -8,7 +8,8 @@
 graphrag-gnn-qa/
 ├── data/
 │   ├── eval/
-│   │   └── questions.sample.jsonl
+│   │   ├── questions.sample.jsonl
+│   │   └── questions.dev.jsonl
 │   ├── raw/
 │   │   └── .gitkeep
 │   ├── processed/
@@ -145,6 +146,8 @@ FastAPI 应用入口，负责创建应用实例并注册路由。
 ```text
 GET /health
 POST /retrieve
+POST /graph/retrieve
+POST /retrieval/debug
 POST /qa/ask
 ```
 
@@ -644,9 +647,10 @@ python scripts/evaluate_retrieval.py --vector-top-k 3 --graph-top-k 5 --graph-ma
 
 ```text
 questions.sample.jsonl
+questions.dev.jsonl
 ```
 
-`retrieval_eval_results.jsonl` 是脚本运行生成的评估结果文件。
+`questions.sample.jsonl` 用于快速 smoke test，`questions.dev.jsonl` 用于当前阶段的小规模指标验证和配置对比。`retrieval_eval_results.jsonl` 是脚本运行生成的评估结果文件。
 
 ### `data/raw/`
 
@@ -751,20 +755,21 @@ python -m pytest
 
 ## 后续扩展方向
 
-下一阶段会在当前 Neo4j 知识图谱基础上继续实现：
+当前 GraphRAG MVP 已经完成向量检索、图谱检索、混合证据融合、问答生成和 citations 返回。下一阶段优先完善评估与展示闭环：
 
 ```text
-Neo4j 知识图谱 + Milvus 向量库
-  -> GraphRAG 混合检索
-  -> Graph-aware Answer Generation
+questions.dev.jsonl
+  -> evaluate_retrieval.py
+  -> retrieval_debug + qa + metrics + summary
+  -> 可复现实验记录和结果对比
 ```
 
-之后继续扩展：
+之后继续扩展 Rerank 和 GNN 能力：
 
 ```text
-chunks.jsonl
-  -> LLM 实体关系抽取
-  -> Neo4j 知识图谱
-  -> GraphRAG 混合检索
+Neo4j 知识图谱 + Hybrid Evidence
+  -> Rerank 二阶段排序
   -> GNN 节点表示增强
+  -> GNN-assisted retrieval
+  -> 完整消融实验
 ```

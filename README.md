@@ -402,16 +402,16 @@ python scripts/search_graph.py "GraphRAG" --top-k 5 --max-depth 2
 - `evidence`
 - `confidence`
 
-## 初步开发路线
+## 开发路线与当前状态
 
-### 阶段一：项目初始化
+### 阶段一：项目初始化（已完成）
 
 - 创建 GitHub 仓库。
 - 编写 README。
 - 配置 Python 依赖。
 - 配置 Git 忽略规则。
 
-### 阶段二：Vector-only RAG Baseline
+### 阶段二：Vector-only RAG Baseline（已完成）
 
 - 实现文档读取。
 - 实现文本切分。
@@ -419,27 +419,34 @@ python scripts/search_graph.py "GraphRAG" --top-k 5 --max-depth 2
 - 接入 Milvus 向量检索。
 - 实现基础问答接口。
 
-### 阶段三：知识图谱构建
+### 阶段三：知识图谱构建（已完成）
 
 - 使用 LLM 抽取实体和关系。
 - 设计 Neo4j 图谱 Schema。
 - 将三元组、来源和证据写入 Neo4j。
 
-### 阶段四：GraphRAG 混合检索
+### 阶段四：GraphRAG 混合检索（已完成）
 
 - 实现问题实体识别。
 - 实现 Neo4j 子图遍历。
 - 融合向量检索结果和图谱路径结果。
 - 构建带证据的问答上下文。
 
-### 阶段五：GNN 节点表示增强
+### 阶段五：评估指标与项目展示完善（优先推进）
+
+- 自动计算 Recall@K、MRR、citation hit、答案关键词命中和延迟指标。
+- 扩充小规模 dev set。
+- 维护 README 和 docs 的项目状态一致性。
+- 形成可复现实验记录和面试讲解材料。
+
+### 阶段六：GNN 节点表示增强（待实现）
 
 - 从 Neo4j 导出节点和边。
 - 使用 BGE-m3 生成节点初始语义向量。
 - 使用 GAT 学习结构增强节点表示。
 - 将增强后的节点向量写入 Milvus。
 
-### 阶段六：Rerank 与实验评估
+### 阶段七：Rerank 与完整消融实验（待实现）
 
 - 接入 BGE Reranker。
 - 构建多跳 QA 测试集。
@@ -455,4 +462,6 @@ python scripts/search_graph.py "GraphRAG" --top-k 5 --max-depth 2
 
 ## 项目状态
 
-当前状态：项目初始化阶段。
+当前状态：GraphRAG MVP 已完成，当前优先推进评估指标与项目展示完善。
+
+已完成的 MVP 链路包括文档处理、向量检索、图谱构建、混合证据融合、GraphRAG-aware 问答、citations 和评估记录。GNN 节点表示增强与 Rerank 属于后续增强模块，将在当前评估闭环稳定后分阶段接入。
