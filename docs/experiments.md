@@ -138,6 +138,48 @@ FUSION_RANK_WEIGHT=0.3
 
 评估输出会从 `/retrieval/debug` 的 `fusion_weights` 读取实际生效权重并写入 `run_config`，方便对比不同 `.env` 配置下的结果。
 
+## 当前实测记录
+
+### 2026-05-31 GraphRAG MVP dev set
+
+本次实测用于验证当前 GraphRAG MVP 链路是否可以完成从样例文档入库、向量检索、图谱检索、混合证据融合到问答评估的可复现闭环。
+
+数据与配置：
+
+- 原始文档：`data/raw/sample.txt`
+- 问题集：`data/eval/questions.dev.jsonl`
+- 题目数量：8
+- 文本切分：`chunk_size=700`，`chunk_overlap=100`
+- 检索参数：`vector_top_k=3`，`graph_top_k=5`，`graph_max_depth=2`，`qa_top_k=3`
+- 融合权重：`score_weight=0.7`，`rank_weight=0.3`
+- 输出文件：`data/eval/retrieval_eval_results.jsonl`、`data/eval/retrieval_eval_summary.json`
+
+运行命令：
+
+```powershell
+python scripts/evaluate_retrieval.py --input-file data/eval/questions.dev.jsonl --vector-top-k 3 --graph-top-k 5 --graph-max-depth 2 --qa-top-k 3 --timeout 180
+```
+
+实测结果：
+
+| 方法 | 问题数 | Recall@K | MRR | Top1 evidence hit rate | Citation hit rate | Answer hit rate | 平均总延迟 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| GraphRAG MVP | 8 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 24404.0099 ms |
+
+延迟拆分：
+
+| 指标 | 平均耗时 |
+|---|---:|
+| `/retrieval/debug` | 12081.4654 ms |
+| `/qa/ask` | 12322.5443 ms |
+
+结论与限制：
+
+- 当前 dev set 能稳定验证 GraphRAG MVP 的端到端可用性，适合作为本地 smoke test 和项目展示基线。
+- 本次数据集规模较小，且 `questions.dev.jsonl` 与 `sample.txt` 明确对齐，关键词指标会偏乐观，不能作为最终实验结论。
+- 当前平均延迟偏高，主要用于记录现状；性能优化应在评估闭环和对比实验稳定后单独推进。
+- 后续需要扩充 20 到 50 条问题，并补充 Vector-only、GraphRAG、GraphRAG + Rerank、GraphRAG + GNN 等配置对比。
+
 ## 结果记录模板
 
 | 方法 | 多跳准确率 | Recall@5 | MRR | 平均延迟 |

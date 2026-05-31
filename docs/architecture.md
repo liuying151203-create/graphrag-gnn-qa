@@ -4,7 +4,7 @@
 
 本系统旨在构建一个面向科研论文和技术文档的复杂关联知识问答系统，通过 GraphRAG 将向量检索与知识图谱检索结合起来，缓解传统 RAG 在复杂实体关系、多跳关联和证据可解释性方面的不足。
 
-当前阶段定位为 GraphRAG MVP：已经完成文档处理、向量检索、图谱构建、混合证据融合、问答生成、引用返回和评估记录链路。GNN 节点表示增强、Rerank 和自动指标评估作为后续增强模块逐步接入。
+当前阶段定位为 GraphRAG MVP：已经完成文档处理、向量检索、图谱构建、混合证据融合、问答生成、引用返回、轻量自动指标和评估记录链路。GNN 节点表示增强、Rerank 和更完整的对比实验作为后续增强模块逐步接入。
 
 ## 总体架构
 
@@ -133,19 +133,22 @@ Neo4j 知识图谱
 
 ### 评估层
 
-负责记录不同检索和问答配置下的输出结果，为后续消融实验和指标计算提供基础数据。
+负责记录不同检索和问答配置下的输出结果，为后续消融实验和指标对比提供基础数据。
 
 当前已实现：
 
 - `scripts/evaluate_retrieval.py`：批量调用 `/retrieval/debug` 和 `/qa/ask`
 - `run_config`：记录 API 地址、TopK 参数和实际生效的 fusion 权重
-- `summary`：记录召回数量、引用数量和 Top hybrid evidence 摘要
+- `metrics`：记录基于期望关键词的 Recall@K、MRR、citation hit rate、answer keyword match 和 latency
+- `summary`：记录召回数量、引用数量、Top hybrid evidence 摘要和聚合指标
 - `data/eval/questions.sample.jsonl`：样例问题集，用于 smoke test 和链路验证
+- `data/eval/questions.dev.jsonl`：小规模 dev set，用于当前阶段的指标验证和配置对比
 
 待增强：
 
-- 自动计算 Recall@K、MRR、citation hit rate、answer keyword match 和 latency
-- 扩充小规模评估集，用于更稳定的对比实验
+- 扩充 20 到 50 条小规模评估集，用于更稳定的对比实验
+- 补充 Vector-only、GraphRAG、GraphRAG + Rerank、GraphRAG + GNN 等对比结果
+- 引入人工或模型辅助评测，补足关键词指标的局限性
 
 ### GNN 表示学习层
 
@@ -181,13 +184,13 @@ Neo4j 知识图谱
 - `/retrieve`、`/graph/retrieve`、`/retrieval/debug`、`/qa/ask` API
 - GraphRAG Context Builder 和 QA citations
 - 可配置 fusion 权重
-- 评估记录脚本和样例评估数据
+- 评估记录脚本、轻量自动指标、聚合摘要和样例评估数据
 - Pytest 自动化测试覆盖核心模块
 
 ### 部分完成
 
-- 评估体系：已能记录结果，尚未自动计算完整指标
-- 实验数据集：已有样例问题集，尚未扩展为更稳定的小规模 dev set
+- 评估体系：已能记录逐题结果、轻量关键词指标和聚合摘要，仍需更大问题集、对比实验和人工或模型辅助评测
+- 实验数据集：已有样例问题集和小规模 dev set，尚未扩展为更稳定的 20 到 50 条评估集
 - 文档导入：已有命令行数据构建流程，尚未提供上传 API
 
 ### 待实现
@@ -195,7 +198,7 @@ Neo4j 知识图谱
 - `POST /documents/upload` 文档上传与端到端索引构建 API
 - GNN 图导出、GAT 训练、节点向量写入和 GNN 辅助召回
 - Rerank 模块和二阶段证据排序
-- 自动评估指标计算和实验对比报告
+- 更完整的实验对比报告和消融实验
 
 ## 路线图
 
@@ -220,9 +223,9 @@ Neo4j 知识图谱
 目标是让项目更适合简历展示和面试讲解：
 
 - 更新 README、架构文档和实验文档中的真实实现状态
-- 为 `evaluate_retrieval.py` 增加自动指标计算
+- 记录当前 dev set 的可复现实测结果
 - 扩充 20 到 50 条小规模评估问题
-- 输出可对比的实验结果表格
+- 输出 Vector-only、GraphRAG 等可对比的实验结果表格
 
 ### Stage 3：Rerank 增强
 
@@ -268,7 +271,7 @@ Neo4j 知识图谱
 ```text
 一个已经打通 GraphRAG MVP 的工程项目：
 支持文档入库、向量检索、图谱检索、混合证据融合、问答生成、引用返回和评估记录。
-后续通过 Rerank、自动指标和 GNN 节点表示增强继续提升检索质量。
+后续通过 Rerank、GNN 节点表示增强和更完整的对比实验继续提升检索质量。
 ```
 
 面试中可以重点强调：
