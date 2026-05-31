@@ -1,0 +1,17 @@
+GraphRAG-GNN-QA sample corpus
+
+GraphRAG is designed to solve the information fragmentation problem in traditional RAG systems. In a traditional RAG system, vector search often retrieves isolated chunks of text. Those chunks may describe a method, a dataset, or a task separately, but the relationships among the entities can remain hidden. The goal of GraphRAG is to reduce this fragmentation by combining textual evidence with structured relational paths.
+
+Vector-only retrieval can fail in this sample when an answer requires reasoning over multiple related entities. For example, one paragraph may mention a method, another paragraph may mention a task, and a third paragraph may describe how the method helps the task. If the retrieval system only ranks chunks by semantic similarity, it can miss the chain of multiple related entities needed for reasoning.
+
+A knowledge graph can represent entities such as papers, authors, methods, datasets, and tasks. In this project, graph nodes may also represent metrics and technical concepts. These entities help preserve scientific context: a paper can propose a method, a method can solve a task, a method can use a dataset, and a result can be evaluated by a metric.
+
+GraphRAG combines vector search and graph traversal. Vector search retrieves textual evidence from document chunks, while graph traversal retrieves structured relational paths from a Neo4j knowledge graph. The hybrid retrieval layer merges both evidence types so that the answer generator can use textual evidence and structured relational paths at the same time.
+
+GNN models provide an additional benefit by learning graph-aware entity representation. A Graph Attention Network can incorporate graph topology into node embeddings, so related nodes influence each other during representation learning. This can improve entity representation for long-tail concepts that are difficult to retrieve with text similarity alone.
+
+The sample graph should include a relation in which GraphRAG SOLVES_TASK the information fragmentation problem. In schema terms, GraphRAG is a Method, information fragmentation problem is a Task, and the relation type is SOLVES_TASK. The evidence sentence is: "GraphRAG is designed to solve the information fragmentation problem in traditional RAG systems."
+
+The sample graph should also include a relation in which vector-only retrieval is RELATED_TO RAG systems. In schema terms, vector-only retrieval is a Concept, RAG systems is a Concept, and the relation type is RELATED_TO. The evidence sentence is: "Vector-only retrieval can fail in this sample when an answer requires reasoning over multiple related entities in RAG systems."
+
+The two evidence types GraphRAG retrieves in this sample are textual evidence and structured relational paths. Textual evidence comes from vector search over chunks. Structured relational paths come from graph traversal over entities and relations. The GraphRAG answer should cite both evidence types when possible.

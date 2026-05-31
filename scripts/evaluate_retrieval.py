@@ -336,7 +336,7 @@ def evaluate_questions(
     evaluation_records: list[EvaluationRecord] = []
     last_run_config: dict[str, Any] | None = None
 
-    with httpx.Client(base_url=base_url, timeout=timeout, transport=transport) as client:
+    with httpx.Client(base_url=base_url, timeout=timeout, transport=transport, trust_env=False) as client:
         with output_file.open("w", encoding="utf-8") as writer:
             for index, question_record in enumerate(question_records, start=1):
                 question = str(question_record["question"]).strip()

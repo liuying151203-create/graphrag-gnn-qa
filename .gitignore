@@ -30,6 +30,7 @@ Thumbs.db
 .docker-data/
 data/raw/*
 !data/raw/.gitkeep
+!data/raw/sample.txt
 data/processed/*
 !data/processed/.gitkeep
 data/eval/retrieval_eval_results.jsonl
