@@ -71,7 +71,7 @@
 data/eval/questions.sample.jsonl
 ```
 
-小规模 dev set 用于当前阶段的指标验证和配置对比：
+20 条小规模 dev set 用于当前阶段的指标验证和配置对比：
 
 ```text
 data/eval/questions.dev.jsonl
@@ -125,7 +125,7 @@ data/eval/retrieval_eval_summary.json
 
 聚合摘要中的指标由逐题 `metrics` 平均得到；缺失或不适用的指标会被跳过，整组都不可用时返回 `null`。
 
-这些指标是轻量关键词指标，适合当前小规模 dev set 的链路验证和配置对比；正式实验仍需要更大问题集和人工或模型辅助评测。当前 `questions.dev.jsonl` 基于 `data/raw/sample.txt`、`chunks.jsonl` 和 `graph_triples.jsonl` 构造，重点覆盖信息碎片、vector-only retrieval、knowledge graph、graph traversal、GNN、GraphRAG 关系和证据类型等概念。
+这些指标是轻量关键词指标，适合当前小规模 dev set 的链路验证和配置对比；正式实验仍需要更大问题集和人工或模型辅助评测。当前 `questions.dev.jsonl` 包含 20 条问题，基于 `data/raw/sample.txt`、`chunks.jsonl` 和 `graph_triples.jsonl` 构造，重点覆盖信息碎片、vector-only retrieval、knowledge graph、graph traversal、GNN、GraphRAG 关系、证据类型、图节点类型和长尾实体等概念。
 
 评估不同融合策略时，可以在 `.env` 中调整：
 
@@ -140,7 +140,7 @@ FUSION_RANK_WEIGHT=0.3
 
 ## 当前实测记录
 
-### 2026-05-31 GraphRAG MVP dev set
+### 2026-06-01 GraphRAG MVP dev set
 
 本次实测用于验证当前 GraphRAG MVP 链路是否可以完成从样例文档入库、向量检索、图谱检索、混合证据融合到问答评估的可复现闭环。
 
@@ -148,7 +148,7 @@ FUSION_RANK_WEIGHT=0.3
 
 - 原始文档：`data/raw/sample.txt`
 - 问题集：`data/eval/questions.dev.jsonl`
-- 题目数量：8
+- 题目数量：20
 - 文本切分：`chunk_size=700`，`chunk_overlap=100`
 - 检索参数：`vector_top_k=3`，`graph_top_k=5`，`graph_max_depth=2`，`qa_top_k=3`
 - 融合权重：`score_weight=0.7`，`rank_weight=0.3`
@@ -162,23 +162,30 @@ python scripts/evaluate_retrieval.py --input-file data/eval/questions.dev.jsonl 
 
 实测结果：
 
-| 方法 | 问题数 | Recall@K | MRR | Top1 evidence hit rate | Citation hit rate | Answer hit rate | 平均总延迟 |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| GraphRAG MVP | 8 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 24404.0099 ms |
+| 方法 | 问题数 | Evidence keyword recall | Recall@K | MRR | Top1 evidence hit rate | Citation hit rate | Answer keyword recall | Answer hit rate | 平均总延迟 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| GraphRAG MVP | 20 | 0.9708 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 0.8917 | 1.0000 | 31190.8465 ms |
 
 延迟拆分：
 
 | 指标 | 平均耗时 |
 |---|---:|
-| `/retrieval/debug` | 12081.4654 ms |
-| `/qa/ask` | 12322.5443 ms |
+| `/retrieval/debug` | 14507.5994 ms |
+| `/qa/ask` | 16683.2471 ms |
+
+逐题观察：
+
+- `q0012` 和 `q0019` 的检索证据关键词覆盖未达到 1.0，但 `first_relevant_rank` 仍为 1，说明 Top1 证据已经命中核心信息。
+- `q0012`、`q0015`、`q0019` 和 `q0020` 的答案关键词覆盖未达到 1.0，但均至少命中一个期望答案关键词。
+- citation keyword hit rate 为 1.0，说明当前 citations 能稳定指向包含期望关键词的混合证据。
 
 结论与限制：
 
 - 当前 dev set 能稳定验证 GraphRAG MVP 的端到端可用性，适合作为本地 smoke test 和项目展示基线。
 - 本次数据集规模较小，且 `questions.dev.jsonl` 与 `sample.txt` 明确对齐，关键词指标会偏乐观，不能作为最终实验结论。
+- 20 题扩展后，答案关键词覆盖不再全满分，更接近真实评估现象；后续可以继续优化 prompt、证据压缩和关键词设计。
 - 当前平均延迟偏高，主要用于记录现状；性能优化应在评估闭环和对比实验稳定后单独推进。
-- 后续需要扩充 20 到 50 条问题，并补充 Vector-only、GraphRAG、GraphRAG + Rerank、GraphRAG + GNN 等配置对比。
+- 后续需要补充 Vector-only、GraphRAG + Rerank、GraphRAG + GNN 等配置对比。
 
 ## 结果记录模板
 

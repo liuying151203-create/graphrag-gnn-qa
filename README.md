@@ -460,7 +460,7 @@ python scripts/search_graph.py "GraphRAG" --top-k 5 --max-depth 2
 ### 阶段五：评估指标与项目展示完善（优先推进）
 
 - 自动计算 Recall@K、MRR、citation hit、答案关键词命中和延迟指标。
-- 扩充小规模 dev set。
+- 扩充小规模 dev set（当前已扩至 20 条，后续继续引入更真实的论文或技术文档样例）。
 - 维护 README 和 docs 的项目状态一致性。
 - 形成可复现实验记录和面试讲解材料。
 

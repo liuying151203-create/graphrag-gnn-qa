@@ -651,7 +651,7 @@ questions.sample.jsonl
 questions.dev.jsonl
 ```
 
-`questions.sample.jsonl` 用于快速 smoke test，`questions.dev.jsonl` 用于当前阶段的小规模指标验证和配置对比。`retrieval_eval_results.jsonl` 和 `retrieval_eval_summary.json` 是脚本运行生成的评估结果文件。
+`questions.sample.jsonl` 用于快速 smoke test，`questions.dev.jsonl` 当前包含 20 条问题，用于当前阶段的小规模指标验证和配置对比。`retrieval_eval_results.jsonl` 和 `retrieval_eval_summary.json` 是脚本运行生成的评估结果文件。
 
 ### `data/raw/`
 

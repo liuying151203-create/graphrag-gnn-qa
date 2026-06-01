@@ -142,11 +142,11 @@ Neo4j 知识图谱
 - `metrics`：记录基于期望关键词的 Recall@K、MRR、citation hit rate、answer keyword match 和 latency
 - `summary`：记录召回数量、引用数量、Top hybrid evidence 摘要和聚合指标
 - `data/eval/questions.sample.jsonl`：样例问题集，用于 smoke test 和链路验证
-- `data/eval/questions.dev.jsonl`：小规模 dev set，用于当前阶段的指标验证和配置对比
+- `data/eval/questions.dev.jsonl`：20 条小规模 dev set，用于当前阶段的指标验证和配置对比
 
 待增强：
 
-- 扩充 20 到 50 条小规模评估集，用于更稳定的对比实验
+- 将当前 sample-aligned dev set 继续扩充为更稳定、更贴近真实文档的评估集
 - 补充 Vector-only、GraphRAG、GraphRAG + Rerank、GraphRAG + GNN 等对比结果
 - 引入人工或模型辅助评测，补足关键词指标的局限性
 
@@ -190,7 +190,7 @@ Neo4j 知识图谱
 ### 部分完成
 
 - 评估体系：已能记录逐题结果、轻量关键词指标和聚合摘要，仍需更大问题集、对比实验和人工或模型辅助评测
-- 实验数据集：已有样例问题集和小规模 dev set，尚未扩展为更稳定的 20 到 50 条评估集
+- 实验数据集：已有样例问题集和 20 条小规模 dev set，尚未扩展为更稳定、更贴近真实文档的评估集
 - 文档导入：已有命令行数据构建流程，尚未提供上传 API
 
 ### 待实现
@@ -224,7 +224,7 @@ Neo4j 知识图谱
 
 - 更新 README、架构文档和实验文档中的真实实现状态
 - 记录当前 dev set 的可复现实测结果
-- 扩充 20 到 50 条小规模评估问题
+- 继续扩充小规模评估问题，并引入更贴近真实论文或技术文档的样例
 - 输出 Vector-only、GraphRAG 等可对比的实验结果表格
 
 ### Stage 3：Rerank 增强
