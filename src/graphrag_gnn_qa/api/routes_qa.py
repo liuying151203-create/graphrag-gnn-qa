@@ -8,6 +8,7 @@ from graphrag_gnn_qa.config import get_settings
 from graphrag_gnn_qa.graph.neo4j_store import Neo4jGraphStore
 from graphrag_gnn_qa.llm.client import OpenAICompatibleLLMClient
 from graphrag_gnn_qa.rag.qa_service import QAResult, RAGQAService
+from graphrag_gnn_qa.rerank import KeywordOverlapEvidenceReranker
 from graphrag_gnn_qa.retrieval.graph_retriever import GraphRetriever
 from graphrag_gnn_qa.retrieval.vector_retriever import VectorRetriever
 from graphrag_gnn_qa.vectorstore.embedding import SentenceTransformerEmbeddingModel
@@ -102,6 +103,8 @@ def get_qa_service() -> QAService:
             graph_max_depth=settings.graph_max_depth,
             fusion_score_weight=settings.fusion_score_weight,
             fusion_rank_weight=settings.fusion_rank_weight,
+            reranker=KeywordOverlapEvidenceReranker(),
+            rerank_top_k=settings.rerank_top_k,
         )
     except HTTPException:
         raise

@@ -35,7 +35,7 @@ class Settings(BaseSettings):
 
     vector_top_k: int = 8
     graph_top_k: int = 8
-    rerank_top_k: int = 5
+    rerank_top_k: int = Field(default=5, ge=1)
     graph_max_depth: int = 2
     fusion_score_weight: float = Field(default=DEFAULT_FUSION_SCORE_WEIGHT, ge=0)
     fusion_rank_weight: float = Field(default=DEFAULT_FUSION_RANK_WEIGHT, ge=0)

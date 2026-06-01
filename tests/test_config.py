@@ -22,3 +22,8 @@ def test_settings_rejects_negative_fusion_weight() -> None:
 def test_settings_rejects_zero_total_fusion_weight() -> None:
     with pytest.raises(ValidationError):
         Settings(fusion_score_weight=0, fusion_rank_weight=0, _env_file=None)
+
+
+def test_settings_rejects_invalid_rerank_top_k() -> None:
+    with pytest.raises(ValidationError):
+        Settings(rerank_top_k=0, _env_file=None)

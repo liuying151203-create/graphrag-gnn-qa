@@ -119,6 +119,7 @@ http://localhost:8000/health
 - `POST /qa/ask` GraphRAG-aware 问答 API
 - GraphRAG Context Builder，用于统一组织向量上下文、图谱上下文、混合证据上下文和 LLM prompt
 - Hybrid Retrieval Result Model，用于统一表示、融合排序并去重向量证据和图谱证据
+- 轻量可插拔 Rerank 模块，用于在 QA prompt 和 citations 前对 Hybrid Evidence 进行二阶段重排序
 - 检索与问答评估脚本，用于批量记录 `/retrieval/debug`、`/qa/ask` 和 `citations`
 - 基于 LLM 的实体关系抽取脚本
 - Neo4j 图谱节点与关系写入脚本
@@ -284,7 +285,7 @@ POST /retrieval/debug
 - `vector_results`：Milvus 文本块召回结果
 - `graph_results`：Neo4j 图谱关系召回结果
 - `fusion_weights`：本次请求实际使用的融合权重，便于复现实验配置
-- `hybrid_results`：统一后的混合检索证据，包含 `fusion_score`，会按 `document_id + chunk_id` 合并重复证据，并按融合分降序返回，便于后续 rerank、GNN 和引用排序
+- `hybrid_results`：统一后的混合检索证据，包含 `fusion_score`，会按 `document_id + chunk_id` 合并重复证据，并按融合分降序返回，便于 QA rerank、GNN 和引用排序
 
 `fusion_score` 默认由相关性分数和 rank 分数融合得到，可在 `.env` 中调整：
 
@@ -293,7 +294,7 @@ FUSION_SCORE_WEIGHT=0.7
 FUSION_RANK_WEIGHT=0.3
 ```
 
-这两个权重会同时影响 `/retrieval/debug` 的 `hybrid_results` 和 `/qa/ask` 的 `citations` 排序。
+这两个权重会影响 `/retrieval/debug` 的 `hybrid_results` 初始排序；`/qa/ask` 会在混合证据基础上进一步执行轻量 rerank，并将 rerank 后的证据用于 prompt 和 `citations`。
 
 问答 API：
 
@@ -318,7 +319,7 @@ POST /qa/ask
 - `graph_sources`：Neo4j 图谱检索召回的关系证据
 - `citations`：用于生成答案的混合证据引用，包含 `evidence_id`、`evidence_type`、`document_id`、`chunk_id`、`source` 和 `fusion_score`
 
-问答生成时会先构造去重后的 `hybrid_results`，再使用融合排序后的混合证据上下文调用 LLM；响应保留原有来源字段，并额外返回可解释引用。
+问答生成时会先构造去重后的 `hybrid_results`，再对混合证据执行轻量 rerank，最后使用 rerank 后的证据上下文调用 LLM；响应保留原有来源字段，并额外返回可解释引用。
 
 图谱召回会先从自然语言问题中抽取候选实体查询词。例如：
 
@@ -464,16 +465,21 @@ python scripts/search_graph.py "GraphRAG" --top-k 5 --max-depth 2
 - 维护 README 和 docs 的项目状态一致性。
 - 形成可复现实验记录和面试讲解材料。
 
-### 阶段六：GNN 节点表示增强（待实现）
+### 阶段六：Rerank 增强（部分完成）
+
+- 已接入轻量关键词 overlap reranker。
+- 已将 rerank 后的证据用于 QA prompt 和 citations。
+- 待接入 BGE Reranker。
+
+### 阶段七：GNN 节点表示增强（待实现）
 
 - 从 Neo4j 导出节点和边。
 - 使用 BGE-m3 生成节点初始语义向量。
 - 使用 GAT 学习结构增强节点表示。
 - 将增强后的节点向量写入 Milvus。
 
-### 阶段七：Rerank 与完整消融实验（待实现）
+### 阶段八：完整消融实验（待实现）
 
-- 接入 BGE Reranker。
 - 构建多跳 QA 测试集。
 - 对比 Vector-only RAG、GraphRAG、GraphRAG + GNN、GraphRAG + GNN + Rerank。
 
@@ -487,6 +493,6 @@ python scripts/search_graph.py "GraphRAG" --top-k 5 --max-depth 2
 
 ## 项目状态
 
-当前状态：GraphRAG MVP 已完成，当前优先推进评估指标与项目展示完善。
+当前状态：GraphRAG MVP 已完成，当前优先推进评估指标、Rerank 增强与项目展示完善。
 
-已完成的 MVP 链路包括文档处理、向量检索、图谱构建、混合证据融合、GraphRAG-aware 问答、citations 和评估记录。GNN 节点表示增强与 Rerank 属于后续增强模块，将在当前评估闭环稳定后分阶段接入。
+已完成的 MVP 链路包括文档处理、向量检索、图谱构建、混合证据融合、GraphRAG-aware 问答、citations 和评估记录。当前已接入轻量可插拔 Rerank；BGE Reranker、GNN 节点表示增强与完整消融实验将继续分阶段接入。

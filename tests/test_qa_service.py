@@ -10,6 +10,7 @@ from graphrag_gnn_qa.rag.qa_service import (
     retrieve_graph_relations_for_question,
 )
 from graphrag_gnn_qa.retrieval.graph_retriever import RetrievedGraphRelation
+from graphrag_gnn_qa.retrieval.hybrid_result import HybridEvidence
 from graphrag_gnn_qa.retrieval.vector_retriever import RetrievedChunk
 
 
@@ -73,6 +74,19 @@ class FakeLLMClient:
     def generate(self, prompt: str) -> str:
         self.prompt = prompt
         return "GraphRAG combines retrieved text chunks with generation."
+
+
+class FakeReranker:
+    def __init__(self) -> None:
+        self.question = ""
+        self.top_k = 0
+        self.evidence_ids: list[str] = []
+
+    def rerank(self, question: str, evidences: list[HybridEvidence], top_k: int) -> list[HybridEvidence]:
+        self.question = question
+        self.top_k = top_k
+        self.evidence_ids = [evidence.evidence_id for evidence in evidences]
+        return list(reversed(evidences[:top_k]))
 
 
 def test_build_rag_prompt_contains_question_and_context() -> None:
@@ -199,6 +213,35 @@ def test_rag_qa_service_uses_custom_fusion_weights() -> None:
     assert result.citations[0].fusion_score == 0.92
 
 
+def test_rag_qa_service_applies_reranker_before_prompt_and_citations() -> None:
+    llm_client = FakeLLMClient()
+    reranker = FakeReranker()
+    service = RAGQAService(
+        retriever=FakeRetriever(),
+        llm_client=llm_client,
+        graph_retriever=FakeGraphRetriever(),
+        reranker=reranker,
+        rerank_top_k=1,
+    )
+
+    result = service.answer(question="What is GraphRAG?", top_k=3)
+
+    assert reranker.question == "What is GraphRAG?"
+    assert reranker.top_k == 1
+    assert reranker.evidence_ids == ["V1+G1"]
+    assert "evidence_id=V1+G1" in llm_client.prompt
+    assert result.citations == [
+        CitationEvidence(
+            evidence_id="V1+G1",
+            evidence_type="hybrid",
+            document_id="sample",
+            chunk_id="sample_chunk_0000",
+            source="sample.txt",
+            fusion_score=0.944,
+        )
+    ]
+
+
 def test_build_graph_query_terms_extracts_entities_from_question() -> None:
     assert build_graph_query_terms("What is GraphRAG?") == ["What is GraphRAG?", "GraphRAG"]
 
@@ -230,3 +273,13 @@ def test_rag_qa_service_rejects_invalid_top_k() -> None:
 
     with pytest.raises(ValueError):
         service.answer(question="GraphRAG", top_k=0)
+
+
+def test_rag_qa_service_rejects_invalid_rerank_top_k() -> None:
+    with pytest.raises(ValueError):
+        RAGQAService(
+            retriever=FakeRetriever(),
+            llm_client=FakeLLMClient(),
+            reranker=FakeReranker(),
+            rerank_top_k=0,
+        )

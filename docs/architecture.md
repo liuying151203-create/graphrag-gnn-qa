@@ -4,7 +4,7 @@
 
 本系统旨在构建一个面向科研论文和技术文档的复杂关联知识问答系统，通过 GraphRAG 将向量检索与知识图谱检索结合起来，缓解传统 RAG 在复杂实体关系、多跳关联和证据可解释性方面的不足。
 
-当前阶段定位为 GraphRAG MVP：已经完成文档处理、向量检索、图谱构建、混合证据融合、问答生成、引用返回、轻量自动指标和评估记录链路。GNN 节点表示增强、Rerank 和更完整的对比实验作为后续增强模块逐步接入。
+当前阶段定位为 GraphRAG MVP：已经完成文档处理、向量检索、图谱构建、混合证据融合、问答生成、引用返回、轻量自动指标和评估记录链路，并已接入轻量可插拔 Rerank。BGE Reranker、GNN 节点表示增强和更完整的对比实验作为后续增强模块逐步接入。
 
 ## 总体架构
 
@@ -29,6 +29,7 @@
   -> Milvus 向量检索
   -> Neo4j 图谱邻域检索
   -> Hybrid Evidence 转换、去重和融合排序
+  -> Rerank 二阶段证据排序
   -> GraphRAG Context Builder
   -> LLM 生成答案
   -> 返回 answer、sources、graph_sources 和 citations
@@ -70,6 +71,7 @@ Neo4j 知识图谱
 - LLM、Neo4j、Milvus 和检索参数配置
 - `FUSION_SCORE_WEIGHT` 和 `FUSION_RANK_WEIGHT` 可配置
 - 融合权重非负且不能同时为零的校验
+- `RERANK_TOP_K` 可配置，并要求大于等于 1
 
 ### 文档处理层
 
@@ -128,7 +130,7 @@ Neo4j 知识图谱
 
 - `RAGQAService`：GraphRAG-aware 问答服务
 - `build_hybrid_rag_prompt`：基于去重混合证据构造 prompt
-- `/qa/ask`：返回答案、向量来源、图谱来源和混合证据引用
+- `/qa/ask`：返回答案、向量来源、图谱来源和 rerank 后的混合证据引用
 - `citations`：返回答案使用的 `evidence_id`、`evidence_type`、`document_id`、`chunk_id`、`source` 和 `fusion_score`
 
 ### 评估层
@@ -165,8 +167,9 @@ Neo4j 知识图谱
 
 当前状态：
 
-- 配置中已预留 `reranker_model` 和 `rerank_top_k`
-- 尚未实现独立 reranker 模块，也尚未接入 QA prompt 构建流程
+- 已实现 `rerank/` 模块和轻量关键词 overlap reranker
+- 已将 rerank 后的 Hybrid Evidence 用于 QA prompt 和 citations
+- 配置中已预留 `reranker_model`，后续可接入 BGE Reranker 或 cross-encoder reranker
 
 ## 当前实现状态
 
@@ -184,6 +187,7 @@ Neo4j 知识图谱
 - `/retrieve`、`/graph/retrieve`、`/retrieval/debug`、`/qa/ask` API
 - GraphRAG Context Builder 和 QA citations
 - 可配置 fusion 权重
+- 轻量可插拔 Rerank，用于 QA prompt 和 citations 前的二阶段证据排序
 - 评估记录脚本、轻量自动指标、聚合摘要和样例评估数据
 - Pytest 自动化测试覆盖核心模块
 
@@ -191,13 +195,14 @@ Neo4j 知识图谱
 
 - 评估体系：已能记录逐题结果、轻量关键词指标和聚合摘要，仍需更大问题集、对比实验和人工或模型辅助评测
 - 实验数据集：已有样例问题集和 20 条小规模 dev set，尚未扩展为更稳定、更贴近真实文档的评估集
+- Rerank：已接入轻量规则 rerank，尚未接入 BGE Reranker
 - 文档导入：已有命令行数据构建流程，尚未提供上传 API
 
 ### 待实现
 
 - `POST /documents/upload` 文档上传与端到端索引构建 API
 - GNN 图导出、GAT 训练、节点向量写入和 GNN 辅助召回
-- Rerank 模块和二阶段证据排序
+- BGE Reranker 或 cross-encoder reranker 接入
 - 更完整的实验对比报告和消融实验
 
 ## 路线图
@@ -229,13 +234,13 @@ Neo4j 知识图谱
 
 ### Stage 3：Rerank 增强
 
-状态：待实现。
+状态：部分完成。
 
 目标是在 Hybrid Evidence 之后增加二阶段排序：
 
-- 新增 reranker 模块
-- 支持 cross-encoder 或轻量规则 rerank
-- 将 rerank 后的证据用于 QA prompt 和 citations
+- 已新增轻量 reranker 模块
+- 已将 rerank 后的证据用于 QA prompt 和 citations
+- 后续接入 BGE Reranker 或 cross-encoder reranker
 - 对比 rerank 前后的 citation hit rate 和 answer quality
 
 ### Stage 4：GNN 节点表示增强
@@ -271,7 +276,7 @@ Neo4j 知识图谱
 ```text
 一个已经打通 GraphRAG MVP 的工程项目：
 支持文档入库、向量检索、图谱检索、混合证据融合、问答生成、引用返回和评估记录。
-后续通过 Rerank、GNN 节点表示增强和更完整的对比实验继续提升检索质量。
+后续通过 BGE Reranker、GNN 节点表示增强和更完整的对比实验继续提升检索质量。
 ```
 
 面试中可以重点强调：
@@ -280,4 +285,4 @@ Neo4j 知识图谱
 - 支持向量检索和图谱检索的统一证据建模
 - 支持可解释 citations
 - 支持可配置 fusion 权重和可复现实验记录
-- GNN 和 Rerank 有清晰的后续接入路线
+- 已有轻量 Rerank 接入点，GNN 和 BGE Reranker 有清晰的后续接入路线

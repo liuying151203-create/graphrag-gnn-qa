@@ -59,6 +59,9 @@ graphrag-gnn-qa/
 │       │   ├── __init__.py
 │       │   ├── context_builder.py
 │       │   └── qa_service.py
+│       ├── rerank/
+│       │   ├── __init__.py
+│       │   └── evidence_reranker.py
 │       ├── retrieval/
 │       │   ├── __init__.py
 │       │   ├── graph_retriever.py
@@ -88,6 +91,7 @@ graphrag-gnn-qa/
 │   ├── test_neo4j_store.py
 │   ├── test_qa_api.py
 │   ├── test_qa_service.py
+│   ├── test_evidence_reranker.py
 │   ├── test_query_entities.py
 │   ├── test_retrieve_api.py
 │   ├── test_search_graph.py
@@ -155,7 +159,7 @@ POST /qa/ask
 
 配置管理模块，基于 `pydantic-settings` 从 `.env` 读取配置。
 
-Neo4j、Milvus、LLM、Embedding、TopK 和 hybrid fusion 权重等参数都会统一从这里读取。
+Neo4j、Milvus、LLM、Embedding、TopK、hybrid fusion 权重和 rerank 参数等都会统一从这里读取。
 
 ### `api/`
 
@@ -327,7 +331,7 @@ RAG 问答编排模块目录。
 
 #### `qa_service.py`
 
-负责编排向量检索、图谱检索和 LLM 调用，返回答案和来源证据。
+负责编排向量检索、图谱检索、Hybrid Evidence 构建、可选 rerank 和 LLM 调用，返回答案和来源证据。
 
 当前包含：
 
@@ -335,7 +339,8 @@ RAG 问答编排模块目录。
 - `GraphEvidence`：图谱来源证据结构
 - `CitationEvidence`：答案引用的混合证据结构
 - `QAResult`：问答结果结构
-- `RAGQAService`：检索、调用 Context Builder、调用 LLM 的完整问答流程
+- `EvidenceReranker`：证据 rerank 协议
+- `RAGQAService`：检索、构建 Hybrid Evidence、可选 rerank、调用 Context Builder、调用 LLM 的完整问答流程
 
 #### `context_builder.py`
 
@@ -444,6 +449,22 @@ What is GraphRAG?
 ```
 
 当前用于 GraphRAG-aware QA 中的 Neo4j 图谱召回增强。
+
+### `rerank/`
+
+证据二阶段排序模块目录。
+
+当前包含：
+
+- `evidence_reranker.py`：轻量 Hybrid Evidence reranker
+
+#### `evidence_reranker.py`
+
+当前包含：
+
+- `KeywordOverlapEvidenceReranker`：基于问题词与证据内容/元数据重叠的轻量确定性 reranker
+
+该 reranker 不依赖模型下载，适合本地开发、测试和先打通 QA rerank 链路。当前 `/qa/ask` 会在 Hybrid Evidence 构建后、prompt 和 citations 生成前执行 rerank；后续可在该模块内替换或扩展为 BGE Reranker。
 
 ## `scripts/`
 
@@ -706,6 +727,7 @@ graph_triples.jsonl
 - 检索调试 API
 - 图谱检索 API
 - GraphRAG Context Builder
+- Rerank 模块
 - Query entity extraction 模块
 - GraphRAG-aware 问答模块
 - 检索与问答评估记录脚本
@@ -745,6 +767,7 @@ python -m pytest
   -> retrieval/debug
   -> hybrid_results
   -> RAGQAService
+  -> rerank hybrid evidence
   -> answer + sources + graph_sources + citations
   -> extract_graph.py
   -> graph_triples.jsonl
@@ -765,11 +788,11 @@ questions.dev.jsonl
   -> 可复现实验记录和结果对比
 ```
 
-之后继续扩展 Rerank 和 GNN 能力：
+之后继续扩展 BGE Reranker 和 GNN 能力：
 
 ```text
 Neo4j 知识图谱 + Hybrid Evidence
-  -> Rerank 二阶段排序
+  -> BGE Reranker 二阶段排序
   -> GNN 节点表示增强
   -> GNN-assisted retrieval
   -> 完整消融实验

@@ -48,10 +48,10 @@ multipart/form-data
 
 用于接收用户问题，并返回结合混合检索证据上下文生成的答案和来源证据。
 
-当前状态：已实现 GraphRAG-aware 版本，问答生成内部使用去重后的 Hybrid Evidence Context。
+当前状态：已实现 GraphRAG-aware 版本，问答生成内部使用去重后的 Hybrid Evidence Context，并在生成 prompt 和 citations 前执行轻量 rerank。
 
 图谱召回会从自然语言问题中抽取候选实体查询词，例如 `What is GraphRAG?` 会额外使用 `GraphRAG` 查询 Neo4j。
-向量检索结果和图谱检索结果会先转换为去重、融合排序后的混合证据，最终 LLM prompt 由 GraphRAG Context Builder 统一组织。融合排序使用 `.env` 中的 `FUSION_SCORE_WEIGHT` 和 `FUSION_RANK_WEIGHT`，响应中的 `sources` 和 `graph_sources` 保持兼容，并通过 `citations` 返回答案使用的混合证据引用。
+向量检索结果和图谱检索结果会先转换为去重、融合排序后的混合证据，再执行轻量 rerank，最终 LLM prompt 由 GraphRAG Context Builder 统一组织。融合排序使用 `.env` 中的 `FUSION_SCORE_WEIGHT` 和 `FUSION_RANK_WEIGHT`，rerank 截断数量使用 `.env` 中的 `RERANK_TOP_K`，响应中的 `sources` 和 `graph_sources` 保持兼容，并通过 `citations` 返回答案使用的混合证据引用。
 
 请求示例：
 

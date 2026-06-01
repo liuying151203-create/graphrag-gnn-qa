@@ -39,6 +39,8 @@
 
 在候选上下文合并后，使用 Reranker 对候选证据进行重排序。
 
+当前工程已接入轻量关键词 overlap reranker，用于先打通 `Hybrid Evidence -> Rerank -> QA Prompt -> Citations` 链路。BGE Reranker 或 cross-encoder reranker 将在后续替换或扩展该模块。
+
 ## 评估指标
 
 ### Recall@K
@@ -185,7 +187,7 @@ python scripts/evaluate_retrieval.py --input-file data/eval/questions.dev.jsonl 
 - 本次数据集规模较小，且 `questions.dev.jsonl` 与 `sample.txt` 明确对齐，关键词指标会偏乐观，不能作为最终实验结论。
 - 20 题扩展后，答案关键词覆盖不再全满分，更接近真实评估现象；后续可以继续优化 prompt、证据压缩和关键词设计。
 - 当前平均延迟偏高，主要用于记录现状；性能优化应在评估闭环和对比实验稳定后单独推进。
-- 后续需要补充 Vector-only、GraphRAG + Rerank、GraphRAG + GNN 等配置对比。
+- 后续需要在更稳定的数据集上补充 Vector-only、GraphRAG + Rerank、GraphRAG + GNN 等配置对比。
 
 ## 结果记录模板
 
