@@ -4,6 +4,7 @@ from typing import Any
 from neo4j import GraphDatabase
 
 from graphrag_gnn_qa.graph.extractor import ALLOWED_ENTITY_TYPES, ALLOWED_RELATION_TYPES
+from graphrag_gnn_qa.gnn.graph_dataset import GraphDataset, graph_dataset_from_records
 
 
 class Neo4jGraphStore:
@@ -67,6 +68,12 @@ class Neo4jGraphStore:
             result = session.run(build_neighbor_search_query(max_depth), query_text=query_text, top_k=top_k)
             return [dict(record) for record in result]
 
+    def export_graph_dataset(self) -> GraphDataset:
+        with self.driver.session(database=self.database) as session:
+            node_records = [dict(record) for record in session.run(build_export_nodes_query())]
+            edge_records = [dict(record) for record in session.run(build_export_edges_query())]
+        return graph_dataset_from_records(node_records=node_records, edge_records=edge_records)
+
 
 def build_entity_id(entity_type: str, name: str) -> str:
     validate_entity_type(entity_type)
@@ -121,6 +128,34 @@ def build_neighbor_search_query(max_depth: int) -> str:
         "relationship.source AS source, "
         "relationship.evidence AS evidence, "
         "relationship.confidence AS confidence"
+    )
+
+
+def build_export_nodes_query() -> str:
+    return (
+        "MATCH (node) "
+        "WHERE node.id IS NOT NULL "
+        "RETURN node.id AS node_id, "
+        "node.name AS name, "
+        "labels(node)[0] AS node_type, "
+        "coalesce(node.description, '') AS description "
+        "ORDER BY node_id"
+    )
+
+
+def build_export_edges_query() -> str:
+    return (
+        "MATCH (source_node)-[relationship]->(target_node) "
+        "WHERE source_node.id IS NOT NULL AND target_node.id IS NOT NULL "
+        "RETURN source_node.id AS source_id, "
+        "target_node.id AS target_id, "
+        "type(relationship) AS relation_type, "
+        "coalesce(relationship.chunk_id, '') AS chunk_id, "
+        "coalesce(relationship.document_id, '') AS document_id, "
+        "coalesce(relationship.source, '') AS source, "
+        "coalesce(relationship.evidence, '') AS evidence, "
+        "coalesce(relationship.confidence, 0.0) AS confidence "
+        "ORDER BY source_id, relation_type, target_id, chunk_id"
     )
 
 

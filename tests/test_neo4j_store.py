@@ -3,6 +3,8 @@ import pytest
 from graphrag_gnn_qa.graph.neo4j_store import (
     build_entity_id,
     build_entity_merge_query,
+    build_export_edges_query,
+    build_export_nodes_query,
     build_neighbor_search_query,
     build_relation_merge_query,
     validate_entity_type,
@@ -45,6 +47,24 @@ def test_build_neighbor_search_query() -> None:
 def test_build_neighbor_search_query_rejects_invalid_depth() -> None:
     with pytest.raises(ValueError):
         build_neighbor_search_query(max_depth=0)
+
+
+def test_build_export_nodes_query() -> None:
+    query = build_export_nodes_query()
+
+    assert "MATCH (node)" in query
+    assert "node.id AS node_id" in query
+    assert "labels(node)[0] AS node_type" in query
+    assert "ORDER BY node_id" in query
+
+
+def test_build_export_edges_query() -> None:
+    query = build_export_edges_query()
+
+    assert "MATCH (source_node)-[relationship]->(target_node)" in query
+    assert "source_node.id AS source_id" in query
+    assert "type(relationship) AS relation_type" in query
+    assert "relationship.confidence" in query
 
 
 def test_validate_entity_type_rejects_unknown_type() -> None:

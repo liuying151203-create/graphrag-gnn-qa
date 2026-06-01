@@ -26,6 +26,7 @@ graphrag-gnn-qa/
 ├── scripts/
 │   ├── embed_chunks.py
 │   ├── evaluate_retrieval.py
+│   ├── export_graph_dataset.py
 │   ├── extract_graph.py
 │   ├── ingest_documents.py
 │   ├── load_graph_to_neo4j.py
@@ -48,6 +49,9 @@ graphrag-gnn-qa/
 │       │   ├── __init__.py
 │       │   ├── extractor.py
 │       │   └── neo4j_store.py
+│       ├── gnn/
+│       │   ├── __init__.py
+│       │   └── graph_dataset.py
 │       ├── ingestion/
 │       │   ├── __init__.py
 │       │   ├── document_loader.py
@@ -79,7 +83,9 @@ graphrag-gnn-qa/
 │   ├── test_embed_chunks.py
 │   ├── test_embedding.py
 │   ├── test_evaluate_retrieval.py
+│   ├── test_export_graph_dataset.py
 │   ├── test_extract_graph.py
+│   ├── test_graph_dataset.py
 │   ├── test_graph_extractor.py
 │   ├── test_graph_api.py
 │   ├── test_graph_retriever.py
@@ -296,12 +302,33 @@ POST /qa/ask
 
 当前包含：
 
-- `Neo4jGraphStore`：封装 Neo4j driver、约束创建、节点和关系写入
+- `Neo4jGraphStore`：封装 Neo4j driver、约束创建、节点和关系写入、图结构导出
 - `build_entity_id`：生成稳定实体 ID
 - `build_entity_merge_query`：构造节点 `MERGE` Cypher
 - `build_relation_merge_query`：构造关系 `MERGE` Cypher
+- `build_export_nodes_query`：构造节点导出 Cypher
+- `build_export_edges_query`：构造边导出 Cypher
 - `validate_entity_type`：校验实体类型白名单
 - `validate_relation_type`：校验关系类型白名单
+
+### `gnn/`
+
+GNN 数据构造相关模块目录。
+
+当前包含：
+
+- `graph_dataset.py`：GNN 图数据集结构
+
+#### `graph_dataset.py`
+
+当前包含：
+
+- `GraphNode`：图节点结构，包含 `node_id`、`name`、`node_type` 和 `description`
+- `GraphEdge`：图边结构，包含 `source_id`、`target_id`、`relation_type`、证据来源和置信度
+- `GraphDataset`：节点和边集合，并提供 `to_dict()` 输出结构化 JSON
+- `graph_dataset_from_records`：将 Neo4j 查询记录转换为 `GraphDataset`
+
+该模块是后续构造 PyTorch Geometric 数据、生成节点初始语义向量和训练 GAT 的输入基础。
 
 ### `llm/`
 
@@ -596,6 +623,39 @@ python scripts/load_graph_to_neo4j.py
 python scripts/load_graph_to_neo4j.py --skip-constraints
 ```
 
+### `export_graph_dataset.py`
+
+当前已经实现的 Neo4j 图结构导出脚本。
+
+默认流程：
+
+```text
+Neo4j 知识图谱
+  -> 读取节点 id、name、type、description
+  -> 读取边 source_id、target_id、relation_type 和证据属性
+  -> data/processed/graph_dataset.json
+```
+
+运行方式：
+
+```powershell
+python scripts/export_graph_dataset.py
+```
+
+可选指定输出文件：
+
+```powershell
+python scripts/export_graph_dataset.py --output-file data/processed/graph_dataset.json
+```
+
+输出结构：
+
+```text
+nodes
+edges
+summary
+```
+
 ### `search_chunks.py`
 
 当前已经实现的 Vector Search Baseline 查询脚本。
@@ -688,6 +748,7 @@ questions.dev.jsonl
 chunks.jsonl
 chunk_embeddings.jsonl
 graph_triples.jsonl
+graph_dataset.json
 ```
 
 生成数据不会提交到 GitHub。
@@ -728,11 +789,13 @@ graph_triples.jsonl
 - 图谱检索 API
 - GraphRAG Context Builder
 - Rerank 模块
+- GNN 图数据集结构
 - Query entity extraction 模块
 - GraphRAG-aware 问答模块
 - 检索与问答评估记录脚本
 - 实体关系抽取模块
 - Neo4j 图谱写入模块
+- Neo4j 图结构导出脚本
 
 运行测试：
 
@@ -773,6 +836,8 @@ python -m pytest
   -> graph_triples.jsonl
   -> load_graph_to_neo4j.py
   -> Neo4j 知识图谱
+  -> export_graph_dataset.py
+  -> graph_dataset.json
   -> search_graph.py
   -> Graph context
 ```
@@ -793,6 +858,7 @@ questions.dev.jsonl
 ```text
 Neo4j 知识图谱 + Hybrid Evidence
   -> BGE Reranker 二阶段排序
+  -> graph_dataset.json
   -> GNN 节点表示增强
   -> GNN-assisted retrieval
   -> 完整消融实验

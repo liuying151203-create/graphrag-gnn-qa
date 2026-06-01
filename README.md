@@ -124,6 +124,7 @@ http://localhost:8000/health
 - 基于 LLM 的实体关系抽取脚本
 - Neo4j 图谱节点与关系写入脚本
 - 基于 Neo4j 的图谱邻域检索脚本
+- Neo4j 图结构导出脚本，用于生成后续 GNN 训练数据输入
 - Pytest 自动化测试
 
 ## 文档处理流程
@@ -428,6 +429,26 @@ python scripts/search_graph.py "GraphRAG" --top-k 5 --max-depth 2
 - `evidence`
 - `confidence`
 
+### 导出 GNN 图数据
+
+在完成 Neo4j 导入后，可以导出节点和边数据，为后续 GAT 训练准备输入：
+
+```powershell
+python scripts/export_graph_dataset.py
+```
+
+默认输出：
+
+```text
+data/processed/graph_dataset.json
+```
+
+当前导出内容包括：
+
+- `nodes`：图谱节点，包含 `node_id`、`name`、`node_type` 和 `description`
+- `edges`：图谱边，包含 `source_id`、`target_id`、`relation_type`、证据来源和置信度
+- `summary`：节点数量和边数量
+
 ## 开发路线与当前状态
 
 ### 阶段一：项目初始化（已完成）
@@ -471,9 +492,9 @@ python scripts/search_graph.py "GraphRAG" --top-k 5 --max-depth 2
 - 已将 rerank 后的证据用于 QA prompt 和 citations。
 - 待接入 BGE Reranker。
 
-### 阶段七：GNN 节点表示增强（待实现）
+### 阶段七：GNN 节点表示增强（部分完成）
 
-- 从 Neo4j 导出节点和边。
+- 已从 Neo4j 导出节点和边，生成 GNN 数据集 JSON。
 - 使用 BGE-m3 生成节点初始语义向量。
 - 使用 GAT 学习结构增强节点表示。
 - 将增强后的节点向量写入 Milvus。
@@ -495,4 +516,4 @@ python scripts/search_graph.py "GraphRAG" --top-k 5 --max-depth 2
 
 当前状态：GraphRAG MVP 已完成，当前优先推进评估指标、Rerank 增强与项目展示完善。
 
-已完成的 MVP 链路包括文档处理、向量检索、图谱构建、混合证据融合、GraphRAG-aware 问答、citations 和评估记录。当前已接入轻量可插拔 Rerank；BGE Reranker、GNN 节点表示增强与完整消融实验将继续分阶段接入。
+已完成的 MVP 链路包括文档处理、向量检索、图谱构建、混合证据融合、GraphRAG-aware 问答、citations 和评估记录。当前已接入轻量可插拔 Rerank，并完成 Neo4j 图结构导出；BGE Reranker、GNN 节点特征构造、GAT 训练与完整消融实验将继续分阶段接入。

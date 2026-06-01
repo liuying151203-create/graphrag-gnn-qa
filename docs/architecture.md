@@ -4,7 +4,7 @@
 
 本系统旨在构建一个面向科研论文和技术文档的复杂关联知识问答系统，通过 GraphRAG 将向量检索与知识图谱检索结合起来，缓解传统 RAG 在复杂实体关系、多跳关联和证据可解释性方面的不足。
 
-当前阶段定位为 GraphRAG MVP：已经完成文档处理、向量检索、图谱构建、混合证据融合、问答生成、引用返回、轻量自动指标和评估记录链路，并已接入轻量可插拔 Rerank。BGE Reranker、GNN 节点表示增强和更完整的对比实验作为后续增强模块逐步接入。
+当前阶段定位为 GraphRAG MVP：已经完成文档处理、向量检索、图谱构建、混合证据融合、问答生成、引用返回、轻量自动指标和评估记录链路，并已接入轻量可插拔 Rerank 和 Neo4j 图结构导出。BGE Reranker、GNN 节点特征构造、GAT 训练和更完整的对比实验作为后续增强模块逐步接入。
 
 ## 总体架构
 
@@ -37,6 +37,7 @@
 后续增强：
 
 Neo4j 知识图谱
+  -> 导出 graph_dataset.json
   -> GNN 节点表示学习
   -> GNN 节点召回
   -> 接入 Hybrid Evidence Fusion
@@ -106,6 +107,7 @@ Neo4j 知识图谱
 - `Neo4jGraphStore`：Neo4j 节点和关系写入
 - `scripts/extract_graph.py`：生成 graph triples
 - `scripts/load_graph_to_neo4j.py`：写入 Neo4j
+- `scripts/export_graph_dataset.py`：导出 GNN 图数据集 JSON
 - `GraphRetriever`：按实体关键词检索图谱邻域关系
 - `scripts/search_graph.py`：命令行图谱检索脚本
 - `POST /graph/retrieve`：图谱检索 API
@@ -158,8 +160,10 @@ Neo4j 知识图谱
 
 当前状态：
 
-- 设计目标已明确
-- 尚未实现 `gnn/` 模块、图导出、GAT 模型训练和 GNN 召回接入
+- 已实现 `gnn/` 图数据结构
+- 已实现 Neo4j 节点和边导出
+- 已提供 `scripts/export_graph_dataset.py`，默认输出 `data/processed/graph_dataset.json`
+- 尚未实现节点初始语义向量、GAT 模型训练和 GNN 召回接入
 
 ### Rerank 层
 
@@ -182,6 +186,7 @@ Neo4j 知识图谱
 - Embedding 生成脚本
 - Milvus 文本块向量写入和向量检索
 - Neo4j 实体关系写入和图谱邻域检索
+- Neo4j 图结构导出和 GNN 数据集 JSON 生成
 - LLM 实体关系抽取
 - GraphRAG 混合检索证据建模、融合排序和去重
 - `/retrieve`、`/graph/retrieve`、`/retrieval/debug`、`/qa/ask` API
@@ -196,12 +201,13 @@ Neo4j 知识图谱
 - 评估体系：已能记录逐题结果、轻量关键词指标和聚合摘要，仍需更大问题集、对比实验和人工或模型辅助评测
 - 实验数据集：已有样例问题集和 20 条小规模 dev set，尚未扩展为更稳定、更贴近真实文档的评估集
 - Rerank：已接入轻量规则 rerank，尚未接入 BGE Reranker
+- GNN：已完成图结构导出，尚未完成节点特征构造、GAT 训练和 GNN 辅助召回
 - 文档导入：已有命令行数据构建流程，尚未提供上传 API
 
 ### 待实现
 
 - `POST /documents/upload` 文档上传与端到端索引构建 API
-- GNN 图导出、GAT 训练、节点向量写入和 GNN 辅助召回
+- GNN 节点特征构造、GAT 训练、节点向量写入和 GNN 辅助召回
 - BGE Reranker 或 cross-encoder reranker 接入
 - 更完整的实验对比报告和消融实验
 
@@ -245,12 +251,12 @@ Neo4j 知识图谱
 
 ### Stage 4：GNN 节点表示增强
 
-状态：待实现。
+状态：部分完成。
 
 目标是体现项目名中的 GNN 能力：
 
-- 从 Neo4j 导出节点、边和节点文本特征
-- 构造 PyTorch Geometric 数据
+- 已从 Neo4j 导出节点和边
+- 待生成节点文本特征并构造 PyTorch Geometric 数据
 - 使用 GAT 学习结构感知节点表示
 - 将 GNN 节点向量写入 Milvus 或单独索引
 - 增加 GNN-assisted node retrieval

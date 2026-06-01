@@ -35,6 +35,8 @@
 
 在 GraphRAG 基础上，使用 GAT 增强后的节点向量辅助长尾实体召回。
 
+当前工程已完成 GNN 的第一步输入准备：可以从 Neo4j 导出节点和边，生成 `data/processed/graph_dataset.json`。后续还需要构造节点初始语义向量、PyTorch Geometric 数据和 GAT 训练流程。
+
 ### GraphRAG + GNN + Rerank
 
 在候选上下文合并后，使用 Reranker 对候选证据进行重排序。
