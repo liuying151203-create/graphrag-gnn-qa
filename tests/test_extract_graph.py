@@ -21,6 +21,11 @@ class FakeLLMClient:
         )
 
 
+class InvalidJsonLLMClient:
+    def generate(self, prompt: str) -> str:
+        return '{"entities": [{"name": "Broken", "type": "Concept", "description": "bad "quote""}], "relations": []}'
+
+
 def test_read_chunk_records(tmp_path: Path) -> None:
     input_file = tmp_path / "chunks.jsonl"
     input_file.write_text(
@@ -56,3 +61,30 @@ def test_extract_graph_writes_jsonl(tmp_path: Path) -> None:
     assert records[0]["chunk_id"] == "sample_chunk_0000"
     assert records[0]["entities"][0]["name"] == "GraphRAG"
     assert records[0]["entities"][0]["type"] == "Method"
+
+
+def test_extract_graph_records_errors_and_continues(tmp_path: Path) -> None:
+    input_file = tmp_path / "chunks.jsonl"
+    output_file = tmp_path / "graph_triples.jsonl"
+    error_file = tmp_path / "graph_extraction_errors.jsonl"
+    chunk = {
+        "chunk_id": "broken_chunk_0000",
+        "document_id": "broken",
+        "source": "broken.txt",
+        "content": "This chunk produces invalid JSON.",
+    }
+    input_file.write_text(json.dumps(chunk), encoding="utf-8")
+
+    extracted_count = extract_graph(
+        input_file=input_file,
+        output_file=output_file,
+        error_file=error_file,
+        extractor=GraphExtractor(llm_client=InvalidJsonLLMClient()),
+    )
+
+    error_records = [json.loads(line) for line in error_file.read_text(encoding="utf-8").splitlines()]
+
+    assert extracted_count == 0
+    assert output_file.read_text(encoding="utf-8") == ""
+    assert error_records[0]["chunk_id"] == "broken_chunk_0000"
+    assert error_records[0]["error_type"] == "JSONDecodeError"

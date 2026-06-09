@@ -1,5 +1,3 @@
-import pytest
-
 from graphrag_gnn_qa.graph.extractor import (
     GraphEntity,
     GraphExtractor,
@@ -77,11 +75,38 @@ def test_parse_extraction_response() -> None:
     ]
 
 
-def test_parse_extraction_response_rejects_unknown_entity_type() -> None:
-    response = '{"entities": [{"name": "Unknown", "type": "UnknownType"}], "relations": []}'
+def test_parse_extraction_response_normalizes_unknown_schema_values() -> None:
+    response = """
+    {
+      "entities": [{"name": "Operating System", "type": "System"}],
+      "relations": [
+        {
+          "source_entity": "Operating System",
+          "source_type": "System",
+          "relation_type": "INSTANCE_OF",
+          "target_entity": "Technology",
+          "target_type": "Category",
+          "evidence": "Operating System is a technology concept.",
+          "confidence": 0.8
+        }
+      ]
+    }
+    """
 
-    with pytest.raises(ValueError):
-        parse_extraction_response(response)
+    entities, relations = parse_extraction_response(response)
+
+    assert entities == [GraphEntity(name="Operating System", type="Concept", description="")]
+    assert relations == [
+        GraphRelation(
+            source_entity="Operating System",
+            source_type="Concept",
+            relation_type="RELATED_TO",
+            target_entity="Technology",
+            target_type="Concept",
+            evidence="Operating System is a technology concept.",
+            confidence=0.8,
+        )
+    ]
 
 
 def test_graph_extractor_extracts_from_chunk() -> None:

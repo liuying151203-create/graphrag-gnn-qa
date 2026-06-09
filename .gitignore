@@ -31,6 +31,9 @@ Thumbs.db
 data/raw/*
 !data/raw/.gitkeep
 !data/raw/sample.txt
+!data/raw/hotpotqa_mini/
+data/raw/hotpotqa_mini/*
+!data/raw/hotpotqa_mini/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
 data/eval/retrieval_eval_results.jsonl

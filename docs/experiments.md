@@ -6,13 +6,20 @@
 
 ## 数据集设计
 
-计划构建一个小规模科研知识问答数据集。
+当前使用三层数据集推进实验：
+
+- `questions.sample.jsonl`：最小 smoke test，用于快速验证链路是否可运行。
+- `questions.dev.jsonl`：20 条项目自定义 dev set，用于验证 GraphRAG MVP、Rerank 和评估指标是否稳定。
+- `questions.hotpotqa_mini.jsonl`：由 HotpotQA dev distractor 子集生成的 50 条多跳问答集，用于后续做更有说服力的检索策略对比。
+
+HotpotQA mini 的 raw 文档来自 HotpotQA 每条样本自带的 `context` 段落；问题集保留 `question`、`answer`、`supporting_facts`、`type` 和 `level`，并转换为当前评估脚本可用的关键词指标字段。当前阶段先不修改知识图谱 schema，Wikipedia 通用实体会主要映射到 `Concept`、`Author`、`Institution` 或 `RELATED_TO` 等已有类型；如果后续发现图谱抽取收益受限，再单独扩展通用实体类型。
 
 数据来源：
 
 - AI / NLP / GNN / RAG 相关论文摘要
 - 技术博客
 - 开源项目文档
+- HotpotQA dev distractor 子集中的 Wikipedia context 和 supporting facts
 
 问题类型：
 
@@ -79,6 +86,18 @@ data/eval/questions.sample.jsonl
 
 ```text
 data/eval/questions.dev.jsonl
+```
+
+HotpotQA mini 用于后续中等规模多跳检索对比：
+
+```text
+data/eval/questions.hotpotqa_mini.jsonl
+```
+
+生成 HotpotQA mini：
+
+```powershell
+python scripts/build_hotpotqa_mini.py --input-file data/raw/hotpotqa_official/hotpotqa_hf_rows_validation_50.json --limit 50 --output-raw-dir data/raw/hotpotqa_mini --output-questions-file data/eval/questions.hotpotqa_mini.jsonl
 ```
 
 运行方式：

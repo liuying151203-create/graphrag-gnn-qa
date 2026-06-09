@@ -16,6 +16,8 @@ ALLOWED_RELATION_TYPES = {
     "EVALUATED_BY",
     "RELATED_TO",
 }
+DEFAULT_ENTITY_TYPE = "Concept"
+DEFAULT_RELATION_TYPE = "RELATED_TO"
 
 
 @dataclass(frozen=True)
@@ -94,9 +96,7 @@ def strip_json_markdown(response: str) -> str:
 
 
 def parse_entity(entity: dict[str, Any]) -> GraphEntity:
-    entity_type = entity["type"]
-    if entity_type not in ALLOWED_ENTITY_TYPES:
-        raise ValueError(f"Unsupported entity type: {entity_type}")
+    entity_type = normalize_entity_type(entity.get("type"))
     return GraphEntity(
         name=entity["name"].strip(),
         type=entity_type,
@@ -105,15 +105,9 @@ def parse_entity(entity: dict[str, Any]) -> GraphEntity:
 
 
 def parse_relation(relation: dict[str, Any]) -> GraphRelation:
-    source_type = relation["source_type"]
-    target_type = relation["target_type"]
-    relation_type = relation["relation_type"]
-    if source_type not in ALLOWED_ENTITY_TYPES:
-        raise ValueError(f"Unsupported source entity type: {source_type}")
-    if target_type not in ALLOWED_ENTITY_TYPES:
-        raise ValueError(f"Unsupported target entity type: {target_type}")
-    if relation_type not in ALLOWED_RELATION_TYPES:
-        raise ValueError(f"Unsupported relation type: {relation_type}")
+    source_type = normalize_entity_type(relation.get("source_type"))
+    target_type = normalize_entity_type(relation.get("target_type"))
+    relation_type = normalize_relation_type(relation.get("relation_type"))
     return GraphRelation(
         source_entity=relation["source_entity"].strip(),
         source_type=source_type,
@@ -123,6 +117,20 @@ def parse_relation(relation: dict[str, Any]) -> GraphRelation:
         evidence=relation.get("evidence", "").strip(),
         confidence=float(relation.get("confidence", 0.0)),
     )
+
+
+def normalize_entity_type(entity_type: Any) -> str:
+    entity_type_text = str(entity_type or "").strip()
+    if entity_type_text in ALLOWED_ENTITY_TYPES:
+        return entity_type_text
+    return DEFAULT_ENTITY_TYPE
+
+
+def normalize_relation_type(relation_type: Any) -> str:
+    relation_type_text = str(relation_type or "").strip()
+    if relation_type_text in ALLOWED_RELATION_TYPES:
+        return relation_type_text
+    return DEFAULT_RELATION_TYPE
 
 
 def graph_result_to_dict(result: GraphExtractionResult) -> dict[str, Any]:

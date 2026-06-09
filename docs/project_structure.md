@@ -9,8 +9,12 @@ graphrag-gnn-qa/
 ├── data/
 │   ├── eval/
 │   │   ├── questions.sample.jsonl
-│   │   └── questions.dev.jsonl
+│   │   ├── questions.dev.jsonl
+│   │   └── questions.hotpotqa_mini.jsonl
 │   ├── raw/
+│   │   ├── hotpotqa_mini/
+│   │   │   └── .gitkeep
+│   │   ├── sample.txt
 │   │   └── .gitkeep
 │   ├── processed/
 │   │   └── .gitkeep
@@ -28,6 +32,7 @@ graphrag-gnn-qa/
 │   ├── evaluate_retrieval.py
 │   ├── export_graph_dataset.py
 │   ├── extract_graph.py
+│   ├── build_hotpotqa_mini.py
 │   ├── ingest_documents.py
 │   ├── load_graph_to_neo4j.py
 │   ├── load_embeddings_to_milvus.py
@@ -497,7 +502,7 @@ What is GraphRAG?
 
 命令行脚本目录，用于执行离线任务。
 
-### `ingest_documents.py`
+  ### `ingest_documents.py`
 
 当前已经实现的文档处理脚本。
 
@@ -519,8 +524,34 @@ python scripts/ingest_documents.py
 可选参数：
 
 ```powershell
-python scripts/ingest_documents.py --chunk-size 800 --chunk-overlap 120
-```
+  python scripts/ingest_documents.py --chunk-size 800 --chunk-overlap 120
+  ```
+
+  ### `build_hotpotqa_mini.py`
+
+  当前已经实现的 HotpotQA mini 数据集适配脚本。
+
+  默认流程：
+
+  ```text
+  HotpotQA official JSON 或 Hugging Face rows JSON
+    -> 读取 context 段落作为 raw txt 文档
+    -> 读取 question、answer、supporting_facts 作为评估问题
+    -> data/raw/hotpotqa_mini/
+    -> data/eval/questions.hotpotqa_mini.jsonl
+  ```
+
+  运行方式：
+
+  ```powershell
+  python scripts/build_hotpotqa_mini.py --input-file data/raw/hotpotqa_official/hotpotqa_hf_rows_validation_50.json --limit 50
+  ```
+
+  说明：
+
+  - `data/raw/hotpotqa_official/` 用于本地缓存官方或镜像数据文件，不提交到 GitHub。
+  - `data/raw/hotpotqa_mini/*.txt` 是由脚本生成的本地 raw 文档，不提交到 GitHub。
+  - `data/eval/questions.hotpotqa_mini.jsonl` 是可复现评估问题集，会提交到 GitHub。
 
 ### `embed_chunks.py`
 
@@ -728,17 +759,18 @@ python scripts/evaluate_retrieval.py --vector-top-k 3 --graph-top-k 5 --graph-ma
 当前包含：
 
 ```text
-questions.sample.jsonl
-questions.dev.jsonl
-```
+  questions.sample.jsonl
+  questions.dev.jsonl
+  questions.hotpotqa_mini.jsonl
+  ```
 
 `questions.sample.jsonl` 用于快速 smoke test，`questions.dev.jsonl` 当前包含 20 条问题，用于当前阶段的小规模指标验证和配置对比。`retrieval_eval_results.jsonl` 和 `retrieval_eval_summary.json` 是脚本运行生成的评估结果文件。
 
 ### `data/raw/`
 
-存放原始文档，例如论文 PDF、Markdown 文档或 TXT 文本。
+  存放原始文档，例如论文 PDF、Markdown 文档、TXT 文本或由 HotpotQA context 生成的 raw 文档。
 
-真实数据文件不会提交到 GitHub。
+  真实数据文件和生成的 HotpotQA raw 文档不会提交到 GitHub；仓库只保留 `sample.txt`、目录占位文件和可复现的数据构建脚本。
 
 ### `data/processed/`
 
