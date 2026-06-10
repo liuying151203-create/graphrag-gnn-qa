@@ -329,6 +329,7 @@ def evaluate_questions(
     timeout: float = 60.0,
     transport: httpx.BaseTransport | None = None,
     summary_file: Path | None = Path("data/eval/retrieval_eval_summary.json"),
+    progress_every: int = 1,
 ) -> int:
     question_records = read_question_records(input_file)
     output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -385,8 +386,17 @@ def evaluate_questions(
                     "summary": build_summary(retrieval_debug=retrieval_debug, qa=qa),
                 }
                 writer.write(json.dumps(evaluation_record, ensure_ascii=False) + "\n")
+                writer.flush()
                 evaluation_records.append(evaluation_record)
                 last_run_config = run_config
+                print_progress(
+                    index=index,
+                    total_count=len(question_records),
+                    question_id=question_id,
+                    retrieval_debug_latency_ms=retrieval_debug_latency_ms,
+                    qa_latency_ms=qa_latency_ms,
+                    progress_every=progress_every,
+                )
 
     if summary_file is not None:
         summary_file.parent.mkdir(parents=True, exist_ok=True)
@@ -407,6 +417,29 @@ def evaluate_questions(
     return len(question_records)
 
 
+def print_progress(
+    index: int,
+    total_count: int,
+    question_id: str,
+    retrieval_debug_latency_ms: float,
+    qa_latency_ms: float,
+    progress_every: int,
+) -> None:
+    if progress_every <= 0:
+        return
+    if index != total_count and index % progress_every != 0:
+        return
+    total_latency_ms = retrieval_debug_latency_ms + qa_latency_ms
+    print(
+        f"[evaluate_retrieval] {index}/{total_count} "
+        f"id={question_id} "
+        f"retrieval={retrieval_debug_latency_ms:.1f}ms "
+        f"qa={qa_latency_ms:.1f}ms "
+        f"total={total_latency_ms:.1f}ms",
+        flush=True,
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate retrieval debug results and QA citations for question JSONL records.")
     parser.add_argument("--input-file", type=Path, default=Path("data/eval/questions.sample.jsonl"))
@@ -418,6 +451,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--graph-max-depth", type=int, default=None)
     parser.add_argument("--qa-top-k", type=int, default=None)
     parser.add_argument("--timeout", type=float, default=60.0)
+    parser.add_argument("--progress-every", type=int, default=1, help="Print progress every N questions. Use 0 to disable.")
     return parser.parse_args()
 
 
@@ -433,6 +467,7 @@ def main() -> None:
         graph_max_depth=args.graph_max_depth,
         qa_top_k=args.qa_top_k,
         timeout=args.timeout,
+        progress_every=args.progress_every,
     )
     print(f"Evaluated {evaluated_count} questions: {args.output_file}")
     if args.summary_file is not None:
