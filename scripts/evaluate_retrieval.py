@@ -101,8 +101,7 @@ def keyword_recall(matched_keywords: list[str], expected_keywords: list[str]) ->
     return len(matched_keywords) / len(expected_keywords)
 
 
-def build_retrieval_metrics(retrieval_debug: dict[str, Any], expected_keywords: list[str]) -> dict[str, Any]:
-    hybrid_results = retrieval_debug.get("hybrid_results", [])
+def build_ranked_keyword_metrics(results: list[dict[str, Any]], expected_keywords: list[str]) -> dict[str, Any]:
     if not expected_keywords:
         return {
             "expected_evidence_keyword_count": 0,
@@ -118,7 +117,7 @@ def build_retrieval_metrics(retrieval_debug: dict[str, Any], expected_keywords: 
 
     matched_keywords = []
     first_relevant_rank = None
-    for rank, evidence in enumerate(hybrid_results, start=1):
+    for rank, evidence in enumerate(results, start=1):
         evidence_matches = find_matching_keywords(evidence, expected_keywords)
         for keyword in evidence_matches:
             if keyword not in matched_keywords:
@@ -126,8 +125,8 @@ def build_retrieval_metrics(retrieval_debug: dict[str, Any], expected_keywords: 
         if evidence_matches and first_relevant_rank is None:
             first_relevant_rank = rank
 
-    top_hybrid = hybrid_results[0] if hybrid_results else {}
-    top_hybrid_keyword_hit = bool(find_matching_keywords(top_hybrid, expected_keywords))
+    top_result = results[0] if results else {}
+    top_keyword_hit = bool(find_matching_keywords(top_result, expected_keywords))
 
     return {
         "expected_evidence_keyword_count": len(expected_keywords),
@@ -138,8 +137,26 @@ def build_retrieval_metrics(retrieval_debug: dict[str, Any], expected_keywords: 
         "recall_at_k": 1.0 if first_relevant_rank is not None else 0.0,
         "first_relevant_rank": first_relevant_rank,
         "mrr": 1 / first_relevant_rank if first_relevant_rank is not None else 0.0,
-        "top_hybrid_keyword_hit": top_hybrid_keyword_hit,
+        "top_keyword_hit": top_keyword_hit,
     }
+
+
+def build_retrieval_metrics(retrieval_debug: dict[str, Any], expected_keywords: list[str]) -> dict[str, Any]:
+    metrics = build_ranked_keyword_metrics(
+        results=retrieval_debug.get("hybrid_results", []),
+        expected_keywords=expected_keywords,
+    )
+    metrics["top_hybrid_keyword_hit"] = metrics.pop("top_keyword_hit")
+    return metrics
+
+
+def build_vector_retrieval_metrics(retrieval_debug: dict[str, Any], expected_keywords: list[str]) -> dict[str, Any]:
+    metrics = build_ranked_keyword_metrics(
+        results=retrieval_debug.get("vector_results", []),
+        expected_keywords=expected_keywords,
+    )
+    metrics["top_vector_keyword_hit"] = metrics.pop("top_keyword_hit")
+    return metrics
 
 
 def build_citation_metrics(
@@ -223,6 +240,10 @@ def build_metrics(
             retrieval_debug=retrieval_debug,
             expected_keywords=expected_evidence_keywords,
         ),
+        "vector_retrieval": build_vector_retrieval_metrics(
+            retrieval_debug=retrieval_debug,
+            expected_keywords=expected_evidence_keywords,
+        ),
         "citations": build_citation_metrics(
             retrieval_debug=retrieval_debug,
             qa=qa,
@@ -283,6 +304,12 @@ def build_aggregate_summary(records: list[EvaluationRecord], run_config: dict[st
                 "recall_at_k": average_metric(records, ["metrics", "retrieval", "recall_at_k"]),
                 "mrr": average_metric(records, ["metrics", "retrieval", "mrr"]),
                 "top_hybrid_keyword_hit_rate": average_metric(records, ["metrics", "retrieval", "top_hybrid_keyword_hit"]),
+            },
+            "vector_retrieval": {
+                "avg_evidence_keyword_recall": average_metric(records, ["metrics", "vector_retrieval", "evidence_keyword_recall"]),
+                "recall_at_k": average_metric(records, ["metrics", "vector_retrieval", "recall_at_k"]),
+                "mrr": average_metric(records, ["metrics", "vector_retrieval", "mrr"]),
+                "top_vector_keyword_hit_rate": average_metric(records, ["metrics", "vector_retrieval", "top_vector_keyword_hit"]),
             },
             "citations": {
                 "citation_keyword_hit_rate": average_metric(records, ["metrics", "citations", "citation_keyword_hit"]),

@@ -99,6 +99,12 @@ def test_build_aggregate_summary_averages_key_metrics() -> None:
                     "mrr": 1.0,
                     "top_hybrid_keyword_hit": True,
                 },
+                "vector_retrieval": {
+                    "evidence_keyword_recall": 0.5,
+                    "recall_at_k": 1.0,
+                    "mrr": 0.5,
+                    "top_vector_keyword_hit": False,
+                },
                 "citations": {"citation_keyword_hit": True},
                 "answer": {"answer_keyword_recall": 0.5, "answer_keyword_hit": True},
                 "latency": {"retrieval_debug_ms": 10.0, "qa_ms": 20.0, "total_ms": 30.0},
@@ -111,6 +117,12 @@ def test_build_aggregate_summary_averages_key_metrics() -> None:
                     "recall_at_k": 0.0,
                     "mrr": 0.0,
                     "top_hybrid_keyword_hit": False,
+                },
+                "vector_retrieval": {
+                    "evidence_keyword_recall": 0.0,
+                    "recall_at_k": 0.0,
+                    "mrr": 0.0,
+                    "top_vector_keyword_hit": False,
                 },
                 "citations": {"citation_keyword_hit": False},
                 "answer": {"answer_keyword_recall": 1.0, "answer_keyword_hit": True},
@@ -130,6 +142,12 @@ def test_build_aggregate_summary_averages_key_metrics() -> None:
                 "recall_at_k": 0.5,
                 "mrr": 0.5,
                 "top_hybrid_keyword_hit_rate": 0.5,
+            },
+            "vector_retrieval": {
+                "avg_evidence_keyword_recall": 0.25,
+                "recall_at_k": 0.5,
+                "mrr": 0.25,
+                "top_vector_keyword_hit_rate": 0.0,
             },
             "citations": {"citation_keyword_hit_rate": 0.5},
             "answer": {
@@ -171,6 +189,13 @@ def test_build_metrics_records_keyword_hits_ranks_and_latency() -> None:
             "expected_evidence_keywords": ["GraphRAG", "retrieval"],
         },
         retrieval_debug={
+            "vector_results": [
+                {
+                    "chunk_id": "sample_chunk_0000",
+                    "content": "GraphRAG appears in vector evidence.",
+                    "score": 0.9,
+                }
+            ],
             "hybrid_results": [
                 {
                     "evidence_id": "V1",
@@ -203,6 +228,17 @@ def test_build_metrics_records_keyword_hits_ranks_and_latency() -> None:
             "first_relevant_rank": 2,
             "mrr": 0.5,
             "top_hybrid_keyword_hit": False,
+        },
+        "vector_retrieval": {
+            "expected_evidence_keyword_count": 2,
+            "matched_evidence_keywords": ["graphrag"],
+            "matched_evidence_keyword_count": 1,
+            "evidence_keyword_recall": 0.5,
+            "retrieval_hit": True,
+            "recall_at_k": 1.0,
+            "first_relevant_rank": 1,
+            "mrr": 1.0,
+            "top_vector_keyword_hit": True,
         },
         "citations": {
             "citation_keyword_hit": True,
@@ -251,7 +287,12 @@ def test_evaluate_questions_writes_jsonl_output(tmp_path: Path) -> None:
                 json={
                     "query": "What is GraphRAG?",
                     "fusion_weights": {"score_weight": 0.7, "rank_weight": 0.3},
-                    "vector_results": [{"chunk_id": "sample_chunk_0000"}],
+                    "vector_results": [
+                        {
+                            "chunk_id": "sample_chunk_0000",
+                            "content": "GraphRAG vector evidence.",
+                        }
+                    ],
                     "graph_results": [],
                     "hybrid_results": [
                         {
@@ -321,6 +362,17 @@ def test_evaluate_questions_writes_jsonl_output(tmp_path: Path) -> None:
         "mrr": 1.0,
         "top_hybrid_keyword_hit": True,
     }
+    assert records[0]["metrics"]["vector_retrieval"] == {
+        "expected_evidence_keyword_count": 1,
+        "matched_evidence_keywords": ["graphrag"],
+        "matched_evidence_keyword_count": 1,
+        "evidence_keyword_recall": 1.0,
+        "retrieval_hit": True,
+        "recall_at_k": 1.0,
+        "first_relevant_rank": 1,
+        "mrr": 1.0,
+        "top_vector_keyword_hit": True,
+    }
     assert records[0]["metrics"]["citations"] == {
         "citation_keyword_hit": True,
         "matched_citation_keywords": ["graphrag"],
@@ -345,6 +397,12 @@ def test_evaluate_questions_writes_jsonl_output(tmp_path: Path) -> None:
         "recall_at_k": 1.0,
         "mrr": 1.0,
         "top_hybrid_keyword_hit_rate": 1.0,
+    }
+    assert summary["metrics"]["vector_retrieval"] == {
+        "avg_evidence_keyword_recall": 1.0,
+        "recall_at_k": 1.0,
+        "mrr": 1.0,
+        "top_vector_keyword_hit_rate": 1.0,
     }
     assert summary["metrics"]["citations"] == {"citation_keyword_hit_rate": 1.0}
     assert summary["metrics"]["answer"] == {

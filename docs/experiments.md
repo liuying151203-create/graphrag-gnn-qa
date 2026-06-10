@@ -191,35 +191,43 @@ FUSION_RANK_WEIGHT=0.3
 运行命令：
 
 ```powershell
-python scripts/evaluate_retrieval.py --input-file data/eval/questions.domain_mini.jsonl --vector-top-k 3 --graph-top-k 5 --graph-max-depth 2 --qa-top-k 3 --timeout 180
+python scripts/evaluate_retrieval.py --input-file data/eval/questions.domain_mini.jsonl --vector-top-k 3 --graph-top-k 5 --graph-max-depth 2 --qa-top-k 3 --timeout 180 --progress-every 1
 ```
 
 实测结果：
 
 | 方法 | 问题数 | Evidence keyword recall | Recall@K | MRR | Top1 evidence hit rate | Citation hit rate | Answer keyword recall | Answer hit rate | 平均总延迟 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| GraphRAG + lightweight Rerank | 30 | 0.7492 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 0.6167 | 0.8000 | 35827.6669 ms |
+| GraphRAG + lightweight Rerank | 30 | 0.7492 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 0.6222 | 0.8000 | 31341.8940 ms |
+
+检索对比：
+
+| 检索方式 | 问题数 | Evidence keyword recall | Recall@K | MRR | Top1 keyword hit rate |
+|---|---:|---:|---:|---:|---:|
+| Vector-only | 30 | 0.7161 | 1.0000 | 1.0000 | 1.0000 |
+| GraphRAG hybrid | 30 | 0.7492 | 1.0000 | 1.0000 | 1.0000 |
 
 延迟拆分：
 
 | 指标 | 平均耗时 |
 |---|---:|
-| `/retrieval/debug` | 16927.8783 ms |
-| `/qa/ask` | 18899.7887 ms |
+| `/retrieval/debug` | 14598.4949 ms |
+| `/qa/ask` | 16743.3991 ms |
 
 逐题观察：
 
 - 检索侧 `Recall@K`、`MRR`、Top1 evidence hit rate 和 citation keyword hit rate 均为 1.0，说明 30 个领域问题都能在 TopK 混合证据中命中至少一个期望证据关键词，且 citations 能指向相关证据。
+- 与 Vector-only 相比，GraphRAG hybrid 的 `avg_evidence_keyword_recall` 从 0.7161 提升到 0.7492；逐题看，`domain_q005`、`domain_q014` 和 `domain_q027` 的混合证据关键词覆盖更高，没有题目出现 Vector-only 覆盖更高。
 - `avg_evidence_keyword_recall=0.7492`，说明检索能够命中核心证据，但仍存在多关键词覆盖不足，尤其是跨论文数据集和指标汇总类问题。
-- `avg_answer_keyword_recall=0.6167`、`answer_keyword_hit_rate=0.8`，答案关键词指标偏低。部分问题是答案表达与关键词严格匹配不一致，例如 `node-level attentions` 与 `node-level attention`、`topology-level similarity` 与 `topology similarity`。
+- `avg_answer_keyword_recall=0.6222`、`answer_keyword_hit_rate=0.8`，答案关键词指标偏低。部分问题是答案表达与关键词严格匹配不一致，例如 `node-level attentions` 与 `node-level attention`、`topology-level similarity` 与 `topology similarity`。
 - `domain_q003`、`domain_q012` 等问题出现检索证据已命中关键词，但 QA 阶段仍回答证据不足的情况，说明后续需要优化上下文排序、证据压缩或 prompt。
-- 平均总延迟约 35.8 秒，当前作为 baseline 记录；性能优化后续单独推进。
+- 平均总延迟约 31.3 秒，当前作为 baseline 记录；性能优化后续单独推进。
 
 结论与限制：
 
 - 该结果比样例 dev set 更接近真实论文问答场景，可作为当前项目展示的领域 baseline。
 - 当前指标是轻量关键词指标，不等价于人工答案正确率；后续需要补充人工复核或模型辅助评测。
-- 下一步应优先做 Vector-only RAG、GraphRAG、GraphRAG + lightweight Rerank 的同数据集对比，再判断图谱检索和 rerank 的实际收益。
+- 当前 GraphRAG hybrid 相比 Vector-only 有小幅证据覆盖提升，但收益还不大；后续应继续做更明确的 GraphRAG/no-graph、rerank/no-rerank 消融，并结合人工复核判断真实答案质量。
 - GNN/GAT 仍应定位为探索性增强，当前不作为实验结论主线。
 
 ### 2026-06-01 GraphRAG MVP dev set
