@@ -34,6 +34,8 @@
 - [API 设计](docs/api.md)
 - [知识图谱 Schema 设计](docs/graph_schema.md)
 - [实验设计](docs/experiments.md)
+- [演示指南](docs/demo_guide.md)
+- [面试与简历说明](docs/interview_notes.md)
 - [项目结构说明](docs/project_structure.md)
 - [项目开发工作流与个人偏好](docs/development_workflow.md)
 
@@ -522,3 +524,5 @@ data/processed/graph_dataset.json
 当前状态：GraphRAG 领域 PDF 问答闭环已完成，当前优先推进对比实验、项目展示和面试讲解材料完善。
 
 已完成的核心链路包括 PDF/TXT/Markdown 文档处理、向量检索、图谱构建、混合证据融合、GraphRAG-aware 问答、citations、轻量 Rerank 和评估记录。当前已在 6 篇领域论文和 30 条自建问题上完成 baseline 评估，并记录 Vector-only 与 GraphRAG hybrid 检索对比。GNN/GAT、BGE Reranker 和更完整消融实验将作为后续增强分阶段接入。
+
+当前已有领域 PDF mini set、演示问题清单和 Vector-only vs GraphRAG hybrid baseline，可用于本地演示、GitHub 展示和面试讲解。
