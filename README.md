@@ -1,17 +1,21 @@
 # GraphRAG-GNN-QA
 
-基于 GraphRAG 与 GNN 的复杂关联知识智能问答系统。
+面向科研论文和技术文档的 GraphRAG 知识问答系统。
 
-本项目面向科研论文、技术文档等长文本知识场景，针对传统 RAG 在跨文档复杂实体关系推理中容易出现的信息断裂与大模型幻觉问题，设计并实现一个结合向量检索、知识图谱检索和图神经网络节点表示增强的智能问答系统。
+本项目面向科研论文、技术文档等长文本知识场景，针对传统 RAG 在复杂实体关系、多跳证据组织和引用可解释性方面的不足，设计并实现一个结合 Milvus 向量检索、Neo4j 知识图谱检索、混合证据融合、轻量 Rerank、LLM 问答生成和自动评估的 GraphRAG 系统。
+
+当前主线是一个可运行、可评估、可演示的 GraphRAG 工程闭环；GNN/GAT 节点表示增强保留为探索性优化方向，当前已完成 Neo4j 图结构导出，为后续节点表示学习提供数据基础。
 
 ## 项目目标
 
 - 构建面向科研知识的文档问答系统。
-- 使用 BGE-m3 对文档切片和实体节点进行语义向量化。
+- 使用 BGE-m3 对文档切片进行语义向量化。
 - 使用 Neo4j 存储实体、关系和证据路径。
-- 使用 Milvus 存储文本块向量和 GNN 增强后的节点向量。
+- 使用 Milvus 存储文本块向量。
 - 使用 GraphRAG 实现向量召回与图谱多跳检索的融合。
-- 使用 GAT 对知识图谱节点进行结构感知表示学习。
+- 使用轻量 Rerank 对混合证据进行二阶段排序。
+- 使用评估脚本对 Vector-only 与 GraphRAG hybrid 检索效果进行对比。
+- 预留 GNN/GAT 节点表示增强路线，但不作为当前核心结论。
 - 使用 FastAPI 对外提供文档导入、问答和检索调试接口。
 
 ## 技术栈
@@ -22,9 +26,7 @@
 - Neo4j
 - Milvus
 - BGE-m3
-- PyTorch
-- PyTorch Geometric
-- GAT
+- PyTorch / PyTorch Geometric（后续 GNN 实验预留）
 
 ## 项目文档
 
@@ -121,6 +123,8 @@ http://localhost:8000/health
 - Hybrid Retrieval Result Model，用于统一表示、融合排序并去重向量证据和图谱证据
 - 轻量可插拔 Rerank 模块，用于在 QA prompt 和 citations 前对 Hybrid Evidence 进行二阶段重排序
 - 检索与问答评估脚本，用于批量记录 `/retrieval/debug`、`/qa/ask` 和 `citations`
+- 领域 PDF mini set，基于 6 篇异构图神经网络与鲁棒性论文构造 30 条评估问题
+- Vector-only 与 GraphRAG hybrid 检索指标对比
 - 基于 LLM 的实体关系抽取脚本
 - Neo4j 图谱节点与关系写入脚本
 - 基于 Neo4j 的图谱邻域检索脚本
@@ -431,7 +435,7 @@ python scripts/search_graph.py "GraphRAG" --top-k 5 --max-depth 2
 
 ### 导出 GNN 图数据
 
-在完成 Neo4j 导入后，可以导出节点和边数据，为后续 GAT 训练准备输入：
+在完成 Neo4j 导入后，可以导出节点和边数据，为后续 GNN/GAT 节点表示学习实验准备输入：
 
 ```powershell
 python scripts/export_graph_dataset.py
@@ -482,7 +486,8 @@ data/processed/graph_dataset.json
 ### 阶段五：评估指标与项目展示完善（优先推进）
 
 - 自动计算 Recall@K、MRR、citation hit、答案关键词命中和延迟指标。
-- 扩充小规模 dev set（当前已扩至 20 条，后续继续引入更真实的论文或技术文档样例）。
+- 构建领域 PDF mini set（当前包含 6 篇异构图相关论文和 30 条评估问题）。
+- 对比 Vector-only 与 GraphRAG hybrid 检索指标。
 - 维护 README 和 docs 的项目状态一致性。
 - 形成可复现实验记录和面试讲解材料。
 
@@ -495,14 +500,14 @@ data/processed/graph_dataset.json
 ### 阶段七：GNN 节点表示增强（部分完成）
 
 - 已从 Neo4j 导出节点和边，生成 GNN 数据集 JSON。
-- 使用 BGE-m3 生成节点初始语义向量。
-- 使用 GAT 学习结构增强节点表示。
-- 将增强后的节点向量写入 Milvus。
+- 后续可使用实体文本 embedding 作为节点初始特征。
+- 后续可探索 GraphSAGE/GAT 等模型学习结构感知节点表示。
+- 后续再评估 GNN-assisted entity retrieval 对 Recall@K 和 MRR 的影响。
 
 ### 阶段八：完整消融实验（待实现）
 
-- 构建多跳 QA 测试集。
-- 对比 Vector-only RAG、GraphRAG、GraphRAG + GNN、GraphRAG + GNN + Rerank。
+- 对比 Vector-only RAG、GraphRAG hybrid、GraphRAG + lightweight Rerank。
+- 在 GNN 节点表示完成后，再补充 GraphRAG + GNN 相关消融。
 
 ## 预期实验指标
 
@@ -514,6 +519,6 @@ data/processed/graph_dataset.json
 
 ## 项目状态
 
-当前状态：GraphRAG MVP 已完成，当前优先推进评估指标、Rerank 增强与项目展示完善。
+当前状态：GraphRAG 领域 PDF 问答闭环已完成，当前优先推进对比实验、项目展示和面试讲解材料完善。
 
-已完成的 MVP 链路包括文档处理、向量检索、图谱构建、混合证据融合、GraphRAG-aware 问答、citations 和评估记录。当前已接入轻量可插拔 Rerank，并完成 Neo4j 图结构导出；BGE Reranker、GNN 节点特征构造、GAT 训练与完整消融实验将继续分阶段接入。
+已完成的核心链路包括 PDF/TXT/Markdown 文档处理、向量检索、图谱构建、混合证据融合、GraphRAG-aware 问答、citations、轻量 Rerank 和评估记录。当前已在 6 篇领域论文和 30 条自建问题上完成 baseline 评估，并记录 Vector-only 与 GraphRAG hybrid 检索对比。GNN/GAT、BGE Reranker 和更完整消融实验将作为后续增强分阶段接入。
