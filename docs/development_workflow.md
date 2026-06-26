@@ -347,34 +347,36 @@ git push
 
 ### Stage 3：Rerank 增强
 
-状态：待实现。
+状态：部分完成。
 
 核心目标：
 
-- 新增 reranker 模块
-- 对 Hybrid Evidence 二阶段排序
-- 比较 rerank 前后效果
+- 已新增轻量关键词 overlap reranker 模块
+- 已对 Hybrid Evidence 执行二阶段排序
+- 已将 rerank 后的证据用于 QA prompt 和 citations
+- 后续接入 BGE Reranker 或 cross-encoder reranker
+- 后续比较 rerank/no-rerank 前后效果
 
 ### Stage 4：GNN 节点表示增强
 
-状态：待实现。
+状态：部分完成。
 
 核心目标：
 
-- 从 Neo4j 导出图结构
-- 构造 GNN 训练数据
+- 已从 Neo4j 导出图结构，生成 `graph_dataset.json`
+- 后续构造节点初始语义特征和 PyTorch Geometric 数据
 - 训练 GAT 节点表示
 - 接入 GNN-assisted retrieval
 
 ### Stage 5：完整消融实验
 
-状态：待实现。
+状态：待实现，已记录 Vector-only 与 GraphRAG hybrid 的领域 baseline 对比。
 
 核心目标：
 
-- Vector-only RAG
-- GraphRAG
-- GraphRAG + Rerank
+- Vector-only RAG 与 GraphRAG hybrid 检索对比
+- GraphRAG + lightweight Rerank QA baseline
+- GraphRAG + BGE Reranker
 - GraphRAG + GNN
 - GraphRAG + GNN + Rerank
 - 不同 fusion 权重对比

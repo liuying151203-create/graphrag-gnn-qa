@@ -277,14 +277,36 @@ python scripts/evaluate_retrieval.py --input-file data/eval/questions.dev.jsonl 
 - 当前平均延迟偏高，主要用于记录现状；性能优化应在评估闭环和对比实验稳定后单独推进。
 - 后续需要在更稳定的数据集上补充 Vector-only、GraphRAG + Rerank、GraphRAG + GNN 等配置对比。
 
-## 结果记录模板
+## 消融实验结果汇总
 
-| 方法 | 多跳准确率 | Recall@5 | MRR | 平均延迟 |
-|---|---:|---:|---:|---:|
-| Vector-only RAG | 待实验 | 待实验 | 待实验 | 待实验 |
-| GraphRAG | 待实验 | 待实验 | 待实验 | 待实验 |
-| GraphRAG + GNN | 待实验 | 待实验 | 待实验 | 待实验 |
-| GraphRAG + GNN + Rerank | 待实验 | 待实验 | 待实验 | 待实验 |
+当前已经形成两个层面的 baseline：一是检索侧的 Vector-only 与 GraphRAG hybrid 对比，二是端到端 QA 侧的 GraphRAG + lightweight Rerank baseline。以下表格用于后续继续补充 BGE Reranker、GNN 和 fusion 权重消融。
+
+### Domain PDF mini set 已记录结果
+
+数据集：`data/eval/questions.domain_mini.jsonl`，共 30 题。
+
+| 方法 | 阶段 | 问题数 | Evidence keyword recall | Recall@K | MRR | Top1 evidence hit rate | Citation hit rate | Answer keyword recall | Answer hit rate | 平均总延迟 |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Vector-only | 检索 | 30 | 0.7161 | 1.0000 | 1.0000 | 1.0000 | 不适用 | 不适用 | 不适用 | 未单独记录 |
+| GraphRAG hybrid | 检索 | 30 | 0.7492 | 1.0000 | 1.0000 | 1.0000 | 不适用 | 不适用 | 不适用 | 未单独记录 |
+| GraphRAG + lightweight Rerank | QA | 30 | 0.7492 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 0.6222 | 0.8000 | 31341.8940 ms |
+
+观察：
+
+- GraphRAG hybrid 相比 Vector-only 的 evidence keyword recall 从 0.7161 提升到 0.7492，说明图谱证据融合带来小幅证据覆盖收益。
+- 当前 Recall@K、MRR 和 Top1 evidence hit rate 均为 1.0000，说明该 mini set 的核心证据大多能被 TopK 找到；后续评估需要更难问题集或更细粒度人工复核。
+- GraphRAG + lightweight Rerank 已打通 `Hybrid Evidence -> Rerank -> QA Prompt -> Citations` 链路，但 lightweight reranker 不等价于 BGE Reranker，不能作为强语义重排结论。
+- 平均总延迟约 31.3 秒，当前只作为 baseline 记录，性能优化后续单独推进。
+
+### 待补消融表
+
+| 方法 | 状态 | 目标问题 |
+|---|---|---|
+| GraphRAG without rerank | 待补 | 衡量 lightweight rerank 对 citations 和 answer keyword hit 的影响 |
+| GraphRAG + BGE Reranker | 待实现 | 验证语义重排是否优于关键词 overlap rerank |
+| GraphRAG + GNN | 待实现 | 验证 GNN 节点表示是否改善长尾实体或多跳实体召回 |
+| GraphRAG + GNN + Rerank | 待实现 | 验证 GNN 召回与二阶段重排叠加后的端到端收益 |
+| 不同 fusion 权重配置 | 待补 | 比较 `score_weight` 与 `rank_weight` 对证据覆盖和答案质量的影响 |
 
 ## 消融实验关注点
 

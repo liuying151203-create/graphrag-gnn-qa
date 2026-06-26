@@ -6,10 +6,12 @@
 
 ```text
 graphrag-gnn-qa/
+├── AGENTS.md
 ├── data/
 │   ├── eval/
 │   │   ├── questions.sample.jsonl
 │   │   ├── questions.dev.jsonl
+│   │   ├── questions.domain_mini.jsonl
 │   │   └── questions.hotpotqa_mini.jsonl
 │   ├── raw/
 │   │   ├── hotpotqa_mini/
@@ -23,9 +25,11 @@ graphrag-gnn-qa/
 ├── docs/
 │   ├── api.md
 │   ├── architecture.md
+│   ├── demo_guide.md
 │   ├── development_workflow.md
 │   ├── experiments.md
 │   ├── graph_schema.md
+│   ├── interview_notes.md
 │   └── project_structure.md
 ├── scripts/
 │   ├── embed_chunks.py
@@ -82,6 +86,8 @@ graphrag-gnn-qa/
 │           ├── embedding.py
 │           └── milvus_client.py
 ├── tests/
+│   ├── test_build_hotpotqa_mini.py
+│   ├── test_config.py
 │   ├── test_document_loader.py
 │   ├── test_context_builder.py
 │   ├── test_debug_api.py
@@ -117,6 +123,10 @@ graphrag-gnn-qa/
 ```
 
 ## 根目录文件
+
+### `AGENTS.md`
+
+项目协作规则文档，记录 AI coding assistant 和开发者协作时需要长期遵守的沟通习惯、任务规划、长期维护文档、验证规则、完成汇报和双语 Git 提交规范。
 
 ### `README.md`
 
@@ -797,9 +807,11 @@ graph_dataset.json
 
 - `api.md`：API 设计
 - `architecture.md`：系统架构设计
+- `demo_guide.md`：演示指南
 - `development_workflow.md`：项目开发工作流与个人偏好
 - `graph_schema.md`：知识图谱 Schema 设计
 - `experiments.md`：实验设计
+- `interview_notes.md`：面试与简历说明
 - `project_structure.md`：项目结构说明
 
 ## `tests/`
