@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     llm_model: str = "deepseek-chat"
 
     embedding_model: str = "BAAI/bge-m3"
+    reranker_type: str = "keyword"
     reranker_model: str = "BAAI/bge-reranker-v2-m3"
 
     neo4j_uri: str = "bolt://127.0.0.1:7687"
@@ -46,6 +47,12 @@ class Settings(BaseSettings):
     def validate_fusion_weights(self) -> "Settings":
         if self.fusion_score_weight + self.fusion_rank_weight <= 0:
             raise ValueError("fusion_score_weight and fusion_rank_weight must not both be zero")
+        return self
+
+    @model_validator(mode="after")
+    def validate_reranker_type(self) -> "Settings":
+        if self.reranker_type not in {"keyword", "bge"}:
+            raise ValueError("reranker_type must be one of: keyword, bge")
         return self
 
 

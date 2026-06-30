@@ -1,8 +1,10 @@
 from fastapi.testclient import TestClient
 
-from graphrag_gnn_qa.api.routes_qa import get_qa_service
+from graphrag_gnn_qa.api.routes_qa import build_evidence_reranker, get_qa_service
+from graphrag_gnn_qa.config import Settings
 from graphrag_gnn_qa.main import app
 from graphrag_gnn_qa.rag.qa_service import CitationEvidence, GraphEvidence, QAResult, SourceEvidence
+from graphrag_gnn_qa.rerank import FallbackEvidenceReranker, KeywordOverlapEvidenceReranker
 
 
 class FakeQAService:
@@ -117,3 +119,16 @@ def test_ask_question_rejects_empty_question() -> None:
 
     app.dependency_overrides.clear()
     assert response.status_code == 422
+
+
+def test_build_evidence_reranker_uses_keyword_by_default() -> None:
+    reranker = build_evidence_reranker(Settings(_env_file=None))
+
+    assert isinstance(reranker, KeywordOverlapEvidenceReranker)
+
+
+def test_build_evidence_reranker_wraps_bge_with_fallback() -> None:
+    reranker = build_evidence_reranker(Settings(reranker_type="bge", _env_file=None))
+
+    assert isinstance(reranker, FallbackEvidenceReranker)
+    assert isinstance(reranker.fallback, KeywordOverlapEvidenceReranker)

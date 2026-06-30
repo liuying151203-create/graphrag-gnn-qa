@@ -27,3 +27,20 @@ def test_settings_rejects_zero_total_fusion_weight() -> None:
 def test_settings_rejects_invalid_rerank_top_k() -> None:
     with pytest.raises(ValidationError):
         Settings(rerank_top_k=0, _env_file=None)
+
+
+def test_settings_default_reranker_type() -> None:
+    settings = Settings(_env_file=None)
+
+    assert settings.reranker_type == "keyword"
+
+
+def test_settings_accepts_bge_reranker_type() -> None:
+    settings = Settings(reranker_type="bge", _env_file=None)
+
+    assert settings.reranker_type == "bge"
+
+
+def test_settings_rejects_invalid_reranker_type() -> None:
+    with pytest.raises(ValidationError):
+        Settings(reranker_type="cross_encoder", _env_file=None)

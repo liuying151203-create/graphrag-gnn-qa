@@ -2,7 +2,7 @@
 
 面向科研论文和技术文档的 GraphRAG 知识问答系统。
 
-本项目面向科研论文、技术文档等长文本知识场景，针对传统 RAG 在复杂实体关系、多跳证据组织和引用可解释性方面的不足，设计并实现一个结合 Milvus 向量检索、Neo4j 知识图谱检索、混合证据融合、轻量 Rerank、LLM 问答生成和自动评估的 GraphRAG 系统。
+本项目面向科研论文、技术文档等长文本知识场景，针对传统 RAG 在复杂实体关系、多跳证据组织和引用可解释性方面的不足，设计并实现一个结合 Milvus 向量检索、Neo4j 知识图谱检索、混合证据融合、可配置 Rerank、LLM 问答生成和自动评估的 GraphRAG 系统。
 
 当前主线是一个可运行、可评估、可演示的 GraphRAG 工程闭环；GNN/GAT 节点表示增强保留为探索性优化方向，当前已完成 Neo4j 图结构导出，为后续节点表示学习提供数据基础。
 
@@ -13,7 +13,7 @@
 - 使用 Neo4j 存储实体、关系和证据路径。
 - 使用 Milvus 存储文本块向量。
 - 使用 GraphRAG 实现向量召回与图谱多跳检索的融合。
-- 使用轻量 Rerank 对混合证据进行二阶段排序。
+- 使用可配置 Rerank 对混合证据进行二阶段排序，默认轻量关键词 overlap，可切换到 BGE Reranker。
 - 使用评估脚本对 Vector-only 与 GraphRAG hybrid 检索效果进行对比。
 - 预留 GNN/GAT 节点表示增强路线，但不作为当前核心结论。
 - 使用 FastAPI 对外提供文档导入、问答和检索调试接口。
@@ -123,7 +123,7 @@ http://localhost:8000/health
 - `POST /qa/ask` GraphRAG-aware 问答 API
 - GraphRAG Context Builder，用于统一组织向量上下文、图谱上下文、混合证据上下文和 LLM prompt
 - Hybrid Retrieval Result Model，用于统一表示、融合排序并去重向量证据和图谱证据
-- 轻量可插拔 Rerank 模块，用于在 QA prompt 和 citations 前对 Hybrid Evidence 进行二阶段重排序
+- 可配置 Rerank 模块，用于在 QA prompt 和 citations 前对 Hybrid Evidence 进行二阶段重排序，支持 keyword overlap 与 BGE Reranker
 - 检索与问答评估脚本，用于批量记录 `/retrieval/debug`、`/qa/ask` 和 `citations`
 - 领域 PDF mini set，基于 6 篇异构图神经网络与鲁棒性论文构造 30 条评估问题
 - Vector-only 与 GraphRAG hybrid 检索指标对比
@@ -301,7 +301,12 @@ FUSION_SCORE_WEIGHT=0.7
 FUSION_RANK_WEIGHT=0.3
 ```
 
-这两个权重会影响 `/retrieval/debug` 的 `hybrid_results` 初始排序；`/qa/ask` 会在混合证据基础上进一步执行轻量 rerank，并将 rerank 后的证据用于 prompt 和 `citations`。
+这两个权重会影响 `/retrieval/debug` 的 `hybrid_results` 初始排序；`/qa/ask` 会在混合证据基础上进一步执行 rerank，并将 rerank 后的证据用于 prompt 和 `citations`。默认使用轻量关键词 overlap reranker，也可以通过 `.env` 切换到 BGE Reranker：
+
+```env
+RERANKER_TYPE=bge
+RERANKER_MODEL=BAAI/bge-reranker-v2-m3
+```
 
 问答 API：
 
@@ -326,7 +331,7 @@ POST /qa/ask
 - `graph_sources`：Neo4j 图谱检索召回的关系证据
 - `citations`：用于生成答案的混合证据引用，包含 `evidence_id`、`evidence_type`、`document_id`、`chunk_id`、`source` 和 `fusion_score`
 
-问答生成时会先构造去重后的 `hybrid_results`，再对混合证据执行轻量 rerank，最后使用 rerank 后的证据上下文调用 LLM；响应保留原有来源字段，并额外返回可解释引用。
+问答生成时会先构造去重后的 `hybrid_results`，再对混合证据执行可配置 rerank，最后使用 rerank 后的证据上下文调用 LLM；响应保留原有来源字段，并额外返回可解释引用。
 
 图谱召回会先从自然语言问题中抽取候选实体查询词。例如：
 
@@ -496,8 +501,9 @@ data/processed/graph_dataset.json
 ### 阶段六：Rerank 增强（部分完成）
 
 - 已接入轻量关键词 overlap reranker。
+- 已支持通过 `RERANKER_TYPE=bge` 接入 BGE Reranker。
 - 已将 rerank 后的证据用于 QA prompt 和 citations。
-- 待接入 BGE Reranker。
+- 后续需要补充 BGE/no-BGE、rerank/no-rerank 消融评估。
 
 ### 阶段七：GNN 节点表示增强（部分完成）
 
@@ -523,6 +529,6 @@ data/processed/graph_dataset.json
 
 当前状态：GraphRAG 领域 PDF 问答闭环已完成，当前优先推进对比实验、项目展示和面试讲解材料完善。
 
-已完成的核心链路包括 PDF/TXT/Markdown 文档处理、向量检索、图谱构建、混合证据融合、GraphRAG-aware 问答、citations、轻量 Rerank 和评估记录。当前已在 6 篇领域论文和 30 条自建问题上完成 baseline 评估，并记录 Vector-only 与 GraphRAG hybrid 检索对比。GNN/GAT、BGE Reranker 和更完整消融实验将作为后续增强分阶段接入。
+已完成的核心链路包括 PDF/TXT/Markdown 文档处理、向量检索、图谱构建、混合证据融合、GraphRAG-aware 问答、citations、可配置 Rerank 和评估记录。当前已在 6 篇领域论文和 30 条自建问题上完成 baseline 评估，并记录 Vector-only 与 GraphRAG hybrid 检索对比。GNN/GAT 和更完整消融实验将作为后续增强分阶段接入。
 
 当前已有领域 PDF mini set、演示问题清单和 Vector-only vs GraphRAG hybrid baseline，可用于本地演示、GitHub 展示和面试讲解。

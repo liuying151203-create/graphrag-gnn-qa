@@ -180,7 +180,7 @@ POST /qa/ask
 
 配置管理模块，基于 `pydantic-settings` 从 `.env` 读取配置。
 
-Neo4j、Milvus、LLM、Embedding、TopK、hybrid fusion 权重和 rerank 参数等都会统一从这里读取。
+Neo4j、Milvus、LLM、Embedding、TopK、hybrid fusion 权重、rerank 类型和 rerank 参数等都会统一从这里读取。
 
 ### `api/`
 
@@ -498,15 +498,17 @@ What is GraphRAG?
 
 当前包含：
 
-- `evidence_reranker.py`：轻量 Hybrid Evidence reranker
+- `evidence_reranker.py`：Hybrid Evidence reranker 实现
 
 #### `evidence_reranker.py`
 
 当前包含：
 
 - `KeywordOverlapEvidenceReranker`：基于问题词与证据内容/元数据重叠的轻量确定性 reranker
+- `BGEEvidenceReranker`：基于 `FlagEmbedding.FlagReranker` 的 BGE/cross-encoder 二阶段排序器
+- `FallbackEvidenceReranker`：主 reranker 失败时回退到轻量 reranker
 
-该 reranker 不依赖模型下载，适合本地开发、测试和先打通 QA rerank 链路。当前 `/qa/ask` 会在 Hybrid Evidence 构建后、prompt 和 citations 生成前执行 rerank；后续可在该模块内替换或扩展为 BGE Reranker。
+`keyword` 模式不依赖模型下载，适合本地开发和测试；`bge` 模式通过 `.env` 中的 `RERANKER_MODEL` 加载 BGE Reranker。当前 `/qa/ask` 会在 Hybrid Evidence 构建后、prompt 和 citations 生成前执行 rerank。
 
 ## `scripts/`
 
@@ -897,7 +899,7 @@ questions.dev.jsonl
   -> 可复现实验记录和结果对比
 ```
 
-之后继续扩展 BGE Reranker 和 GNN 能力：
+之后继续扩展 Rerank 消融和 GNN 能力：
 
 ```text
 Neo4j 知识图谱 + Hybrid Evidence

@@ -4,11 +4,11 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from graphrag_gnn_qa.config import get_settings
+from graphrag_gnn_qa.config import Settings, get_settings
 from graphrag_gnn_qa.graph.neo4j_store import Neo4jGraphStore
 from graphrag_gnn_qa.llm.client import OpenAICompatibleLLMClient
 from graphrag_gnn_qa.rag.qa_service import QAResult, RAGQAService
-from graphrag_gnn_qa.rerank import KeywordOverlapEvidenceReranker
+from graphrag_gnn_qa.rerank import BGEEvidenceReranker, FallbackEvidenceReranker, KeywordOverlapEvidenceReranker
 from graphrag_gnn_qa.retrieval.graph_retriever import GraphRetriever
 from graphrag_gnn_qa.retrieval.vector_retriever import VectorRetriever
 from graphrag_gnn_qa.vectorstore.embedding import SentenceTransformerEmbeddingModel
@@ -69,6 +69,18 @@ class QAService(Protocol):
 router = APIRouter(tags=["qa"])
 
 
+def build_evidence_reranker(settings: Settings):
+    keyword_reranker = KeywordOverlapEvidenceReranker()
+    if settings.reranker_type == "keyword":
+        return keyword_reranker
+    if settings.reranker_type == "bge":
+        return FallbackEvidenceReranker(
+            primary=BGEEvidenceReranker(model_name=settings.reranker_model),
+            fallback=keyword_reranker,
+        )
+    raise ValueError(f"Unsupported reranker type: {settings.reranker_type}")
+
+
 def get_qa_service() -> QAService:
     settings = get_settings()
     if not settings.llm_api_key:
@@ -103,7 +115,7 @@ def get_qa_service() -> QAService:
             graph_max_depth=settings.graph_max_depth,
             fusion_score_weight=settings.fusion_score_weight,
             fusion_rank_weight=settings.fusion_rank_weight,
-            reranker=KeywordOverlapEvidenceReranker(),
+            reranker=build_evidence_reranker(settings),
             rerank_top_k=settings.rerank_top_k,
         )
     except HTTPException:

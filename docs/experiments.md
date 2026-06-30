@@ -48,7 +48,7 @@ HotpotQA mini 的 raw 文档来自 HotpotQA 每条样本自带的 `context` 段�
 
 在候选上下文合并后，使用 Reranker 对候选证据进行重排序。
 
-当前工程已接入轻量关键词 overlap reranker，用于先打通 `Hybrid Evidence -> Rerank -> QA Prompt -> Citations` 链路。BGE Reranker 或 cross-encoder reranker 将在后续替换或扩展该模块。
+当前工程已接入轻量关键词 overlap reranker，并支持通过 `RERANKER_TYPE=bge` 切换到 BGE Reranker，用于打通 `Hybrid Evidence -> Rerank -> QA Prompt -> Citations` 链路。历史 baseline 仍主要记录 lightweight rerank 结果，BGE Reranker 的正式收益需要后续补充消融实验。
 
 ## 评估指标
 
@@ -279,7 +279,7 @@ python scripts/evaluate_retrieval.py --input-file data/eval/questions.dev.jsonl 
 
 ## 消融实验结果汇总
 
-当前已经形成两个层面的 baseline：一是检索侧的 Vector-only 与 GraphRAG hybrid 对比，二是端到端 QA 侧的 GraphRAG + lightweight Rerank baseline。以下表格用于后续继续补充 BGE Reranker、GNN 和 fusion 权重消融。
+当前已经形成两个层面的 baseline：一是检索侧的 Vector-only 与 GraphRAG hybrid 对比，二是端到端 QA 侧的 GraphRAG + lightweight Rerank baseline。工程上已支持 BGE Reranker，以下表格用于后续继续补充 BGE Reranker、GNN 和 fusion 权重消融。
 
 ### Domain PDF mini set 已记录结果
 
@@ -303,7 +303,7 @@ python scripts/evaluate_retrieval.py --input-file data/eval/questions.dev.jsonl 
 | 方法 | 状态 | 目标问题 |
 |---|---|---|
 | GraphRAG without rerank | 待补 | 衡量 lightweight rerank 对 citations 和 answer keyword hit 的影响 |
-| GraphRAG + BGE Reranker | 待实现 | 验证语义重排是否优于关键词 overlap rerank |
+| GraphRAG + BGE Reranker | 待补实验 | 验证语义重排是否优于关键词 overlap rerank |
 | GraphRAG + GNN | 待实现 | 验证 GNN 节点表示是否改善长尾实体或多跳实体召回 |
 | GraphRAG + GNN + Rerank | 待实现 | 验证 GNN 召回与二阶段重排叠加后的端到端收益 |
 | 不同 fusion 权重配置 | 待补 | 比较 `score_weight` 与 `rank_weight` 对证据覆盖和答案质量的影响 |
