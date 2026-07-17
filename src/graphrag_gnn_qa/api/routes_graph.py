@@ -3,9 +3,10 @@ from typing import Protocol
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from graphrag_gnn_qa.api.dependencies import get_runtime_resources
 from graphrag_gnn_qa.config import get_settings
-from graphrag_gnn_qa.graph.neo4j_store import Neo4jGraphStore
-from graphrag_gnn_qa.retrieval.graph_retriever import GraphRetriever, RetrievedGraphRelation
+from graphrag_gnn_qa.retrieval.graph_retriever import RetrievedGraphRelation
+from graphrag_gnn_qa.runtime import RuntimeResources
 
 
 class GraphRetrieveRequest(BaseModel):
@@ -47,15 +48,10 @@ class GraphRelationRetriever(Protocol):
 router = APIRouter(tags=["graph"])
 
 
-def get_graph_retriever() -> GraphRelationRetriever:
-    settings = get_settings()
-    graph_store = Neo4jGraphStore(
-        uri=settings.neo4j_uri,
-        username=settings.neo4j_username,
-        password=settings.neo4j_password,
-        database=settings.neo4j_database,
-    )
-    return GraphRetriever(graph_store=graph_store)
+def get_graph_retriever(
+    resources: RuntimeResources = Depends(get_runtime_resources),
+) -> GraphRelationRetriever:
+    return resources.graph_retriever
 
 
 @router.post("/graph/retrieve", response_model=GraphRetrieveResponse)

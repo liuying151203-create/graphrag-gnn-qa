@@ -4,15 +4,10 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from graphrag_gnn_qa.config import Settings, get_settings
-from graphrag_gnn_qa.graph.neo4j_store import Neo4jGraphStore
-from graphrag_gnn_qa.llm.client import OpenAICompatibleLLMClient
-from graphrag_gnn_qa.rag.qa_service import QAResult, RAGQAService
-from graphrag_gnn_qa.rerank import BGEEvidenceReranker, FallbackEvidenceReranker, KeywordOverlapEvidenceReranker
-from graphrag_gnn_qa.retrieval.graph_retriever import GraphRetriever
-from graphrag_gnn_qa.retrieval.vector_retriever import VectorRetriever
-from graphrag_gnn_qa.vectorstore.embedding import SentenceTransformerEmbeddingModel
-from graphrag_gnn_qa.vectorstore.milvus_client import MilvusVectorStore
+from graphrag_gnn_qa.api.dependencies import get_runtime_resources
+from graphrag_gnn_qa.config import get_settings
+from graphrag_gnn_qa.rag.qa_service import QAResult
+from graphrag_gnn_qa.runtime import RuntimeResources
 
 
 class AskRequest(BaseModel):
@@ -69,59 +64,12 @@ class QAService(Protocol):
 router = APIRouter(tags=["qa"])
 
 
-def build_evidence_reranker(settings: Settings):
-    keyword_reranker = KeywordOverlapEvidenceReranker()
-    if settings.reranker_type == "keyword":
-        return keyword_reranker
-    if settings.reranker_type == "bge":
-        return FallbackEvidenceReranker(
-            primary=BGEEvidenceReranker(model_name=settings.reranker_model),
-            fallback=keyword_reranker,
-        )
-    raise ValueError(f"Unsupported reranker type: {settings.reranker_type}")
-
-
-def get_qa_service() -> QAService:
-    settings = get_settings()
-    if not settings.llm_api_key:
+def get_qa_service(
+    resources: RuntimeResources = Depends(get_runtime_resources),
+) -> QAService:
+    if resources.qa_service is None:
         raise HTTPException(status_code=503, detail="LLM_API_KEY is not configured")
-
-    try:
-        embedding_model = SentenceTransformerEmbeddingModel(model_name=settings.embedding_model)
-        vector_store = MilvusVectorStore(
-            host=settings.milvus_host,
-            port=settings.milvus_port,
-            collection_name=settings.milvus_chunk_collection,
-        )
-        vector_store.connect()
-        retriever = VectorRetriever(embedding_model=embedding_model, vector_store=vector_store)
-        graph_store = Neo4jGraphStore(
-            uri=settings.neo4j_uri,
-            username=settings.neo4j_username,
-            password=settings.neo4j_password,
-            database=settings.neo4j_database,
-        )
-        graph_retriever = GraphRetriever(graph_store=graph_store)
-        llm_client = OpenAICompatibleLLMClient(
-            api_key=settings.llm_api_key,
-            base_url=settings.llm_base_url,
-            model=settings.llm_model,
-        )
-        return RAGQAService(
-            retriever=retriever,
-            llm_client=llm_client,
-            graph_retriever=graph_retriever,
-            graph_top_k=settings.graph_top_k,
-            graph_max_depth=settings.graph_max_depth,
-            fusion_score_weight=settings.fusion_score_weight,
-            fusion_rank_weight=settings.fusion_rank_weight,
-            reranker=build_evidence_reranker(settings),
-            rerank_top_k=settings.rerank_top_k,
-        )
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Failed to initialize QA service: {exc}") from exc
+    return resources.qa_service
 
 
 @router.post("/qa/ask", response_model=AskResponse)

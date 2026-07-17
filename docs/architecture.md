@@ -58,10 +58,23 @@ Neo4j 知识图谱
 - `POST /graph/retrieve`：Neo4j 图谱邻域检索接口
 - `POST /retrieval/debug`：向量、图谱和混合检索调试接口
 - `POST /qa/ask`：GraphRAG-aware 问答接口
+- FastAPI lifespan：应用启动时初始化运行时资源，关闭时释放 Milvus 和 Neo4j 连接
 
 待实现：
 
 - `POST /documents/upload`：文档上传并触发解析、切分、向量写入和图谱写入的端到端导入接口
+
+### 运行时资源层
+
+负责管理在线检索和问答共用的长生命周期对象。
+
+当前已实现：
+
+- `RuntimeResources`：统一持有 Embedding、Milvus、Neo4j、VectorRetriever、GraphRetriever、Reranker 和 QA 服务
+- `build_runtime_resources`：按应用生命周期初始化资源，避免每次请求重复加载模型或创建数据库客户端
+- API 依赖从 `app.state.runtime_resources` 获取共享实例
+- 未配置 `LLM_API_KEY` 时保留检索能力，`/qa/ask` 明确返回 503
+- 应用关闭时同时释放 Neo4j driver 和 Milvus connection
 
 ### 配置层
 

@@ -3,10 +3,10 @@ from typing import Protocol
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from graphrag_gnn_qa.api.dependencies import get_runtime_resources
 from graphrag_gnn_qa.config import get_settings
-from graphrag_gnn_qa.retrieval.vector_retriever import RetrievedChunk, VectorRetriever
-from graphrag_gnn_qa.vectorstore.embedding import SentenceTransformerEmbeddingModel
-from graphrag_gnn_qa.vectorstore.milvus_client import MilvusVectorStore
+from graphrag_gnn_qa.retrieval.vector_retriever import RetrievedChunk
+from graphrag_gnn_qa.runtime import RuntimeResources
 
 
 class RetrieveRequest(BaseModel):
@@ -38,16 +38,10 @@ class Retriever(Protocol):
 router = APIRouter(tags=["retrieval"])
 
 
-def get_vector_retriever() -> Retriever:
-    settings = get_settings()
-    embedding_model = SentenceTransformerEmbeddingModel(model_name=settings.embedding_model)
-    vector_store = MilvusVectorStore(
-        host=settings.milvus_host,
-        port=settings.milvus_port,
-        collection_name=settings.milvus_chunk_collection,
-    )
-    vector_store.connect()
-    return VectorRetriever(embedding_model=embedding_model, vector_store=vector_store)
+def get_vector_retriever(
+    resources: RuntimeResources = Depends(get_runtime_resources),
+) -> Retriever:
+    return resources.vector_retriever
 
 
 @router.post("/retrieve", response_model=RetrieveResponse)

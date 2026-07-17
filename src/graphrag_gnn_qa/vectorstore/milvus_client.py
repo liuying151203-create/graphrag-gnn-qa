@@ -83,6 +83,11 @@ class MilvusVectorStore:
 
         connections.connect(alias=self.alias, host=self.host, port=str(self.port))
 
+    def close(self) -> None:
+        from pymilvus import connections
+
+        connections.disconnect(self.alias)
+
     def create_collection(self, dimension: int, drop_existing: bool = False) -> None:
         from pymilvus import Collection, CollectionSchema, DataType, FieldSchema, utility
 

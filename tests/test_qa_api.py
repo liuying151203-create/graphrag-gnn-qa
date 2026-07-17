@@ -1,10 +1,11 @@
 from fastapi.testclient import TestClient
 
-from graphrag_gnn_qa.api.routes_qa import build_evidence_reranker, get_qa_service
+from graphrag_gnn_qa.api.routes_qa import get_qa_service
 from graphrag_gnn_qa.config import Settings
 from graphrag_gnn_qa.main import app
 from graphrag_gnn_qa.rag.qa_service import CitationEvidence, GraphEvidence, QAResult, SourceEvidence
 from graphrag_gnn_qa.rerank import FallbackEvidenceReranker, KeywordOverlapEvidenceReranker
+from graphrag_gnn_qa.runtime import build_evidence_reranker
 
 
 class FakeQAService:

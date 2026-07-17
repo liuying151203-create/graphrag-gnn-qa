@@ -48,8 +48,10 @@ graphrag-gnn-qa/
 │       ├── __init__.py
 │       ├── config.py
 │       ├── main.py
+│       ├── runtime.py
 │       ├── api/
 │       │   ├── __init__.py
+│       │   ├── dependencies.py
 │       │   ├── routes_debug.py
 │       │   ├── routes_graph.py
 │       │   ├── routes_health.py
@@ -112,6 +114,7 @@ graphrag-gnn-qa/
 │   ├── test_evidence_reranker.py
 │   ├── test_query_entities.py
 │   ├── test_retrieve_api.py
+│   ├── test_runtime.py
 │   ├── test_search_graph.py
 │   ├── test_text_splitter.py
 │   └── test_vector_retriever.py
@@ -165,7 +168,7 @@ Git 忽略规则，用于避免提交虚拟环境、缓存、日志、模型文�
 
 ### `main.py`
 
-FastAPI 应用入口，负责创建应用实例并注册路由。
+FastAPI 应用入口，负责创建应用实例、注册路由，并通过 lifespan 初始化和关闭运行时资源。
 
 当前接口：
 
@@ -176,6 +179,10 @@ POST /graph/retrieve
 POST /retrieval/debug
 POST /qa/ask
 ```
+
+### `runtime.py`
+
+应用级运行时资源模块，统一初始化和复用 Embedding、Milvus、Neo4j、VectorRetriever、GraphRetriever、Reranker 和 QA 服务，并负责关闭数据库连接。
 
 ### `config.py`
 
@@ -189,6 +196,7 @@ API 路由目录。
 
 当前包含：
 
+- `dependencies.py`：从 FastAPI `app.state` 获取应用级运行时资源
 - `routes_health.py`：健康检查接口
 - `routes_debug.py`：检索调试接口
 - `routes_graph.py`：图谱检索接口

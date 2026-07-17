@@ -220,6 +220,12 @@ Demo 必须考虑面试现场网络不稳定：
 
 优先级：最高。
 
+当前状态：进行中。
+
+- [x] Phase 1A：使用 FastAPI lifespan 初始化应用级资源，复用 Embedding、Reranker、Milvus、Neo4j 和 QA 服务，并在关闭应用时释放数据库连接。
+- [ ] Phase 1B：增加服务就绪状态和 vector、graph、fusion、rerank、LLM 分阶段耗时。
+- [ ] Phase 1C：实现 Streamlit Demo MVP、方法对比和局部图谱视图。
+
 目标：形成面试官可直接体验的界面，同时解决重复模型加载带来的延迟。
 
 主要任务：

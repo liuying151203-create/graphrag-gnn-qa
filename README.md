@@ -111,6 +111,7 @@ http://localhost:8000/health
 ## 当前已实现能力
 
 - FastAPI 服务启动
+- FastAPI lifespan 运行时资源复用，避免每次请求重复加载 Embedding、Reranker 和数据库客户端
 - `/health` 健康检查接口
 - `.env` 环境变量加载
 - TXT、Markdown、PDF 文档读取
