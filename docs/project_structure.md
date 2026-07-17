@@ -174,6 +174,7 @@ FastAPI 应用入口，负责创建应用实例、注册路由，并通过 lifes
 
 ```text
 GET /health
+GET /ready
 POST /retrieve
 POST /graph/retrieve
 POST /retrieval/debug
@@ -182,7 +183,7 @@ POST /qa/ask
 
 ### `runtime.py`
 
-应用级运行时资源模块，统一初始化和复用 Embedding、Milvus、Neo4j、VectorRetriever、GraphRetriever、Reranker 和 QA 服务，并负责关闭数据库连接。
+应用级运行时资源模块，统一初始化和复用 Embedding、Milvus、Neo4j、VectorRetriever、GraphRetriever、Reranker 和 QA 服务，负责组件就绪检查和数据库连接关闭。
 
 ### `config.py`
 
@@ -205,12 +206,13 @@ API 路由目录。
 
 #### `routes_health.py`
 
-提供健康检查 API。
+提供进程存活检查和完整运行就绪检查 API。
 
 当前接口：
 
 ```text
 GET /health
+GET /ready
 ```
 
 #### `routes_retrieve.py`

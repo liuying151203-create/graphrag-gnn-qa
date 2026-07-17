@@ -1,4 +1,6 @@
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from time import perf_counter
 from typing import Protocol
 
 from graphrag_gnn_qa.config import DEFAULT_FUSION_RANK_WEIGHT, DEFAULT_FUSION_SCORE_WEIGHT
@@ -66,12 +68,23 @@ class CitationEvidence:
 
 
 @dataclass(frozen=True)
+class QATimings:
+    vector_ms: float = 0.0
+    graph_ms: float = 0.0
+    fusion_ms: float = 0.0
+    rerank_ms: float = 0.0
+    llm_ms: float = 0.0
+    total_ms: float = 0.0
+
+
+@dataclass(frozen=True)
 class QAResult:
     question: str
     answer: str
     sources: list[SourceEvidence]
     graph_sources: list[GraphEvidence]
     citations: list[CitationEvidence] = field(default_factory=list)
+    timings: QATimings = field(default_factory=QATimings)
 
 
 class RAGQAService:
@@ -86,6 +99,7 @@ class RAGQAService:
         fusion_rank_weight: float = DEFAULT_FUSION_RANK_WEIGHT,
         reranker: EvidenceReranker | None = None,
         rerank_top_k: int = 5,
+        clock: Callable[[], float] = perf_counter,
     ) -> None:
         if graph_top_k <= 0:
             raise ValueError("graph_top_k must be greater than 0")
@@ -103,6 +117,7 @@ class RAGQAService:
         self.fusion_rank_weight = fusion_rank_weight
         self.reranker = reranker
         self.rerank_top_k = rerank_top_k
+        self.clock = clock
 
     def answer(self, question: str, top_k: int = 5) -> QAResult:
         normalized_question = question.strip()
@@ -111,15 +126,25 @@ class RAGQAService:
         if top_k <= 0:
             raise ValueError("top_k must be greater than 0")
 
+        total_started_at = self.clock()
+
+        vector_started_at = self.clock()
         chunks = self.retriever.retrieve(query=normalized_question, top_k=top_k)
+        vector_ms = self._elapsed_ms(vector_started_at)
+
         graph_relations = []
+        graph_ms = 0.0
         if self.graph_retriever is not None:
+            graph_started_at = self.clock()
             graph_relations = retrieve_graph_relations_for_question(
                 graph_retriever=self.graph_retriever,
                 question=normalized_question,
                 top_k=self.graph_top_k,
                 max_depth=self.graph_max_depth,
             )
+            graph_ms = self._elapsed_ms(graph_started_at)
+
+        fusion_started_at = self.clock()
         hybrid_result = build_hybrid_retrieval_result(
             query=normalized_question,
             chunks=chunks,
@@ -127,18 +152,26 @@ class RAGQAService:
             score_weight=self.fusion_score_weight,
             rank_weight=self.fusion_rank_weight,
         )
+        fusion_ms = self._elapsed_ms(fusion_started_at)
+
         hybrid_evidences = hybrid_result.evidences
+        rerank_ms = 0.0
         if self.reranker is not None:
+            rerank_started_at = self.clock()
             hybrid_evidences = self.reranker.rerank(
                 question=normalized_question,
                 evidences=hybrid_evidences,
                 top_k=self.rerank_top_k,
             )
+            rerank_ms = self._elapsed_ms(rerank_started_at)
         prompt = build_hybrid_rag_prompt(
             question=normalized_question,
             hybrid_evidences=hybrid_evidences,
         )
+
+        llm_started_at = self.clock()
         answer = self.llm_client.generate(prompt)
+        llm_ms = self._elapsed_ms(llm_started_at)
         sources = [
             SourceEvidence(
                 chunk_id=chunk.chunk_id,
@@ -184,7 +217,18 @@ class RAGQAService:
             sources=sources,
             graph_sources=graph_sources,
             citations=citations,
+            timings=QATimings(
+                vector_ms=vector_ms,
+                graph_ms=graph_ms,
+                fusion_ms=fusion_ms,
+                rerank_ms=rerank_ms,
+                llm_ms=llm_ms,
+                total_ms=self._elapsed_ms(total_started_at),
+            ),
         )
+
+    def _elapsed_ms(self, started_at: float) -> float:
+        return round(max(0.0, (self.clock() - started_at) * 1000), 3)
 
 
 def retrieve_graph_relations_for_question(

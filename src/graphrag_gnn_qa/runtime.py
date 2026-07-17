@@ -1,4 +1,6 @@
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Literal
 
 from graphrag_gnn_qa.config import Settings
 from graphrag_gnn_qa.graph.neo4j_store import Neo4jGraphStore
@@ -15,9 +17,13 @@ from graphrag_gnn_qa.retrieval.vector_retriever import VectorRetriever
 from graphrag_gnn_qa.vectorstore.embedding import SentenceTransformerEmbeddingModel
 from graphrag_gnn_qa.vectorstore.milvus_client import MilvusVectorStore
 
+ComponentReadinessStatus = Literal["ready", "unavailable", "not_configured"]
+RuntimeReadinessStatus = Literal["ready", "degraded"]
+
 
 @dataclass
 class RuntimeResources:
+    settings: Settings
     vector_store: MilvusVectorStore
     graph_store: Neo4jGraphStore
     vector_retriever: VectorRetriever
@@ -30,6 +36,42 @@ class RuntimeResources:
             self.graph_store.close()
         finally:
             self.vector_store.close()
+
+    def readiness(self) -> "RuntimeReadiness":
+        components = {
+            "api": ComponentReadiness(status="ready", detail="FastAPI runtime initialized"),
+            "embedding": ComponentReadiness(status="ready", detail=self.settings.embedding_model),
+            "milvus": _probe_component(
+                probe=self.vector_store.ping,
+                ready_detail=f"collection={self.settings.milvus_chunk_collection}",
+            ),
+            "neo4j": _probe_component(
+                probe=self.graph_store.ping,
+                ready_detail=f"database={self.settings.neo4j_database}",
+            ),
+            "reranker": ComponentReadiness(
+                status="ready",
+                detail=_reranker_detail(self.settings),
+            ),
+            "llm": ComponentReadiness(
+                status="ready" if self.qa_service is not None else "not_configured",
+                detail=self.settings.llm_model if self.qa_service is not None else "LLM_API_KEY is not configured",
+            ),
+        }
+        status = "ready" if all(component.status == "ready" for component in components.values()) else "degraded"
+        return RuntimeReadiness(status=status, components=components)
+
+
+@dataclass(frozen=True)
+class ComponentReadiness:
+    status: ComponentReadinessStatus
+    detail: str
+
+
+@dataclass(frozen=True)
+class RuntimeReadiness:
+    status: RuntimeReadinessStatus
+    components: dict[str, ComponentReadiness]
 
 
 def build_evidence_reranker(settings: Settings) -> EvidenceReranker:
@@ -70,6 +112,7 @@ def build_runtime_resources(settings: Settings) -> RuntimeResources:
             reranker=reranker,
         )
         return RuntimeResources(
+            settings=settings,
             vector_store=vector_store,
             graph_store=graph_store,
             vector_retriever=vector_retriever,
@@ -111,3 +154,20 @@ def _build_qa_service(
         reranker=reranker,
         rerank_top_k=settings.rerank_top_k,
     )
+
+
+def _probe_component(probe: Callable[[], None], ready_detail: str) -> ComponentReadiness:
+    try:
+        probe()
+    except Exception as exc:
+        return ComponentReadiness(
+            status="unavailable",
+            detail=f"Readiness check failed: {exc.__class__.__name__}",
+        )
+    return ComponentReadiness(status="ready", detail=ready_detail)
+
+
+def _reranker_detail(settings: Settings) -> str:
+    if settings.reranker_type == "bge":
+        return f"bge:{settings.reranker_model}"
+    return "keyword"

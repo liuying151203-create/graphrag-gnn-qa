@@ -5,6 +5,7 @@ import pytest
 
 from graphrag_gnn_qa.vectorstore.milvus_client import (
     EmbeddingRecord,
+    MilvusVectorStore,
     infer_embedding_dimension,
     prepare_insert_columns,
     read_embedding_records,
@@ -81,4 +82,31 @@ def test_prepare_insert_columns() -> None:
         ["file.txt", "file.txt"],
         ["txt", "txt"],
         [[0.1, 0.2], [0.3, 0.4]],
+    ]
+
+
+def test_milvus_store_connect_ping_and_close(monkeypatch) -> None:
+    calls = []
+    monkeypatch.setattr(
+        "pymilvus.connections.connect",
+        lambda **kwargs: calls.append(("connect", kwargs)),
+    )
+    monkeypatch.setattr(
+        "pymilvus.utility.list_collections",
+        lambda **kwargs: calls.append(("ping", kwargs)),
+    )
+    monkeypatch.setattr(
+        "pymilvus.connections.disconnect",
+        lambda alias: calls.append(("disconnect", alias)),
+    )
+    store = MilvusVectorStore(host="milvus", port=19530, alias="runtime")
+
+    store.connect()
+    store.ping()
+    store.close()
+
+    assert calls == [
+        ("connect", {"alias": "runtime", "host": "milvus", "port": "19530"}),
+        ("ping", {"using": "runtime"}),
+        ("disconnect", "runtime"),
     ]

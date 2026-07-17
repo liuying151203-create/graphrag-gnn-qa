@@ -15,6 +15,9 @@ class Neo4jGraphStore:
     def close(self) -> None:
         self.driver.close()
 
+    def ping(self) -> None:
+        self.driver.verify_connectivity()
+
     def create_constraints(self) -> None:
         with self.driver.session(database=self.database) as session:
             for label in sorted(ALLOWED_ENTITY_TYPES):

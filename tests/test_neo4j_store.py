@@ -1,6 +1,7 @@
 import pytest
 
 from graphrag_gnn_qa.graph.neo4j_store import (
+    Neo4jGraphStore,
     build_entity_id,
     build_entity_merge_query,
     build_export_edges_query,
@@ -10,6 +11,33 @@ from graphrag_gnn_qa.graph.neo4j_store import (
     validate_entity_type,
     validate_relation_type,
 )
+
+
+class FakeDriver:
+    def __init__(self) -> None:
+        self.verify_count = 0
+        self.close_count = 0
+
+    def verify_connectivity(self) -> None:
+        self.verify_count += 1
+
+    def close(self) -> None:
+        self.close_count += 1
+
+
+def test_neo4j_store_ping_and_close(monkeypatch) -> None:
+    driver = FakeDriver()
+    monkeypatch.setattr(
+        "graphrag_gnn_qa.graph.neo4j_store.GraphDatabase.driver",
+        lambda *args, **kwargs: driver,
+    )
+    store = Neo4jGraphStore(uri="bolt://neo4j", username="neo4j", password="password")
+
+    store.ping()
+    store.close()
+
+    assert driver.verify_count == 1
+    assert driver.close_count == 1
 
 
 def test_build_entity_id_normalizes_name() -> None:

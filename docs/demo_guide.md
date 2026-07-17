@@ -15,7 +15,10 @@ python -m uvicorn graphrag_gnn_qa.main:app --app-dir src --host 127.0.0.1 --port
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8000/health
+Invoke-RestMethod http://127.0.0.1:8000/ready
 ```
+
+`/health` 只确认 API 进程存活；`/ready` 会逐项检查 Embedding、Milvus、Neo4j、Reranker 和 LLM。演示前应确认 `/ready` 返回 HTTP 200 且总体状态为 `ready`。
 
 当前演示基于以下已入库数据：
 
@@ -169,6 +172,9 @@ Invoke-RestMethod http://127.0.0.1:8000/retrieval/debug `
 - `graph_results`：Neo4j 返回的实体关系证据。
 - `hybrid_results`：融合后的统一证据，包含 `fusion_score`。
 - `fusion_weights`：实际生效的融合权重。
+- `timings`：Milvus vector、Neo4j graph、fusion 和总耗时。
+
+`/qa/ask` 的 `timings` 还会显示 rerank 与 LLM 耗时，可用于解释热启动后的主要性能瓶颈。
 
 ## 评估演示
 

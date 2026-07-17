@@ -54,6 +54,7 @@ Neo4j 知识图谱
 当前已实现：
 
 - `GET /health`：健康检查接口
+- `GET /ready`：Embedding、Milvus、Neo4j、Reranker 和 LLM 运行就绪检查
 - `POST /retrieve`：Milvus 文本块向量检索接口
 - `POST /graph/retrieve`：Neo4j 图谱邻域检索接口
 - `POST /retrieval/debug`：向量、图谱和混合检索调试接口
@@ -75,6 +76,8 @@ Neo4j 知识图谱
 - API 依赖从 `app.state.runtime_resources` 获取共享实例
 - 未配置 `LLM_API_KEY` 时保留检索能力，`/qa/ask` 明确返回 503
 - 应用关闭时同时释放 Neo4j driver 和 Milvus connection
+- `RuntimeResources.readiness`：执行 Milvus 和 Neo4j 探针，并汇总模型、Reranker 与 LLM 配置状态
+- 就绪探针失败时返回脱敏的组件状态，不返回内部连接异常详情
 
 ### 配置层
 
@@ -136,7 +139,7 @@ Neo4j 知识图谱
 - `fusion_score`：融合原始相关性分数和 rank 分数
 - `deduplicate_hybrid_evidences`：按 `document_id + chunk_id` 合并重复证据
 - `build_hybrid_retrieval_result`：构造完整混合检索结果
-- `/retrieval/debug`：返回 `vector_results`、`graph_results`、`hybrid_results` 和实际 `fusion_weights`
+- `/retrieval/debug`：返回 `vector_results`、`graph_results`、`hybrid_results`、实际 `fusion_weights` 和 vector/graph/fusion 分阶段耗时
 
 ### RAG 问答层
 
@@ -148,6 +151,7 @@ Neo4j 知识图谱
 - `build_hybrid_rag_prompt`：基于去重混合证据构造 prompt
 - `/qa/ask`：返回答案、向量来源、图谱来源和 rerank 后的混合证据引用
 - `citations`：返回答案使用的 `evidence_id`、`evidence_type`、`document_id`、`chunk_id`、`source` 和 `fusion_score`
+- `timings`：记录 vector、graph、fusion、rerank、LLM 和 QA 总耗时
 
 ### 评估层
 

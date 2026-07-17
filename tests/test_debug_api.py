@@ -58,7 +58,12 @@ def test_debug_retrieval_returns_vector_and_graph_results() -> None:
 
     app.dependency_overrides.clear()
     assert response.status_code == 200
-    assert response.json() == {
+    response_json = response.json()
+    timings = response_json.pop("timings")
+    assert set(timings) == {"vector_ms", "graph_ms", "fusion_ms", "total_ms"}
+    assert all(value >= 0 for value in timings.values())
+    assert timings["total_ms"] >= max(timings["vector_ms"], timings["graph_ms"], timings["fusion_ms"])
+    assert response_json == {
         "query": "What is GraphRAG?",
         "vector_top_k": 3,
         "graph_top_k": 5,

@@ -99,6 +99,14 @@ def test_ask_question() -> None:
                 "fusion_score": 0.944,
             }
         ],
+        "timings": {
+            "vector_ms": 0.0,
+            "graph_ms": 0.0,
+            "fusion_ms": 0.0,
+            "rerank_ms": 0.0,
+            "llm_ms": 0.0,
+            "total_ms": 0.0,
+        },
     }
 
 
@@ -122,8 +130,8 @@ def test_ask_question_rejects_empty_question() -> None:
     assert response.status_code == 422
 
 
-def test_build_evidence_reranker_uses_keyword_by_default() -> None:
-    reranker = build_evidence_reranker(Settings(_env_file=None))
+def test_build_evidence_reranker_uses_keyword_when_configured() -> None:
+    reranker = build_evidence_reranker(Settings(reranker_type="keyword", _env_file=None))
 
     assert isinstance(reranker, KeywordOverlapEvidenceReranker)
 

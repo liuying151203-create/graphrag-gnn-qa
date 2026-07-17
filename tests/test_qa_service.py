@@ -3,6 +3,7 @@ import pytest
 from graphrag_gnn_qa.rag.qa_service import (
     CitationEvidence,
     GraphEvidence,
+    QATimings,
     RAGQAService,
     SourceEvidence,
     build_graph_query_terms,
@@ -87,6 +88,14 @@ class FakeReranker:
         self.top_k = top_k
         self.evidence_ids = [evidence.evidence_id for evidence in evidences]
         return list(reversed(evidences[:top_k]))
+
+
+class FakeClock:
+    def __init__(self, values: list[float]) -> None:
+        self.values = iter(values)
+
+    def __call__(self) -> float:
+        return next(self.values)
 
 
 def test_build_rag_prompt_contains_question_and_context() -> None:
@@ -240,6 +249,44 @@ def test_rag_qa_service_applies_reranker_before_prompt_and_citations() -> None:
             fusion_score=0.944,
         )
     ]
+
+
+def test_rag_qa_service_records_stage_timings() -> None:
+    clock = FakeClock(
+        [
+            0.000,
+            0.001,
+            0.011,
+            0.011,
+            0.031,
+            0.031,
+            0.036,
+            0.036,
+            0.040,
+            0.040,
+            0.060,
+            0.061,
+        ]
+    )
+    service = RAGQAService(
+        retriever=FakeRetriever(),
+        llm_client=FakeLLMClient(),
+        graph_retriever=FakeGraphRetriever(),
+        reranker=FakeReranker(),
+        rerank_top_k=1,
+        clock=clock,
+    )
+
+    result = service.answer(question="What is GraphRAG?", top_k=3)
+
+    assert result.timings == QATimings(
+        vector_ms=10.0,
+        graph_ms=20.0,
+        fusion_ms=5.0,
+        rerank_ms=4.0,
+        llm_ms=20.0,
+        total_ms=61.0,
+    )
 
 
 def test_build_graph_query_terms_extracts_entities_from_question() -> None:

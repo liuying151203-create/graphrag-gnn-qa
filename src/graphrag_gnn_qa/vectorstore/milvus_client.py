@@ -88,6 +88,11 @@ class MilvusVectorStore:
 
         connections.disconnect(self.alias)
 
+    def ping(self) -> None:
+        from pymilvus import utility
+
+        utility.list_collections(using=self.alias)
+
     def create_collection(self, dimension: int, drop_existing: bool = False) -> None:
         from pymilvus import Collection, CollectionSchema, DataType, FieldSchema, utility
 

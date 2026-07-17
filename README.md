@@ -113,6 +113,7 @@ http://localhost:8000/health
 - FastAPI 服务启动
 - FastAPI lifespan 运行时资源复用，避免每次请求重复加载 Embedding、Reranker 和数据库客户端
 - `/health` 健康检查接口
+- `/ready` 运行就绪检查，返回 Embedding、Milvus、Neo4j、Reranker 和 LLM 的组件状态
 - `.env` 环境变量加载
 - TXT、Markdown、PDF 文档读取
 - 固定长度重叠文本切分
@@ -123,6 +124,7 @@ http://localhost:8000/health
 - `POST /graph/retrieve` 图谱检索 API
 - `POST /retrieval/debug` 检索调试 API
 - `POST /qa/ask` GraphRAG-aware 问答 API
+- 检索和问答分阶段耗时，覆盖 vector、graph、fusion、rerank 和 LLM
 - GraphRAG Context Builder，用于统一组织向量上下文、图谱上下文、混合证据上下文和 LLM prompt
 - Hybrid Retrieval Result Model，用于统一表示、融合排序并去重向量证据和图谱证据
 - 可配置 Rerank 模块，用于在 QA prompt 和 citations 前对 Hybrid Evidence 进行二阶段重排序，支持 keyword overlap 与 BGE Reranker

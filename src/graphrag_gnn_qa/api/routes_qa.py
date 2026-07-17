@@ -48,12 +48,22 @@ class CitationEvidenceResponse(BaseModel):
     fusion_score: float
 
 
+class QATimingsResponse(BaseModel):
+    vector_ms: float
+    graph_ms: float
+    fusion_ms: float
+    rerank_ms: float
+    llm_ms: float
+    total_ms: float
+
+
 class AskResponse(BaseModel):
     question: str
     answer: str
     sources: list[SourceEvidenceResponse]
     graph_sources: list[GraphEvidenceResponse]
     citations: list[CitationEvidenceResponse]
+    timings: QATimingsResponse
 
 
 class QAService(Protocol):
@@ -93,4 +103,5 @@ def ask_question(
         sources=[SourceEvidenceResponse(**source.__dict__) for source in result.sources],
         graph_sources=[GraphEvidenceResponse(**source.__dict__) for source in result.graph_sources],
         citations=[CitationEvidenceResponse(**citation.__dict__) for citation in result.citations],
+        timings=QATimingsResponse(**result.timings.__dict__),
     )

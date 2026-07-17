@@ -4,7 +4,7 @@
 
 ### `GET /health`
 
-用于检查后端服务是否正常运行。
+用于检查 FastAPI 进程是否正常运行，不探测外部依赖。
 
 响应示例：
 
@@ -13,6 +13,32 @@
   "status": "ok",
   "app_name": "graphrag-gnn-qa",
   "environment": "development"
+}
+```
+
+### `GET /ready`
+
+用于检查完整 GraphRAG 问答链路是否就绪。接口会探测应用运行时、Embedding、Milvus、Neo4j、Reranker 和 LLM 配置。
+
+- 所有组件就绪时返回 HTTP 200，`status` 为 `ready`。
+- 任一组件不可用或未配置时返回 HTTP 503，`status` 为 `degraded`。
+- 组件状态包括 `ready`、`unavailable` 和 `not_configured`。
+- 探针失败只返回异常类型，不暴露内部地址或敏感配置。
+- Milvus 和 Neo4j 会执行实际连接探针；Embedding、Reranker 和 LLM 当前报告初始化或配置状态，不会通过 `/ready` 触发模型推理或付费 LLM 请求。
+
+响应示例：
+
+```json
+{
+  "status": "ready",
+  "components": {
+    "api": {"status": "ready", "detail": "FastAPI runtime initialized"},
+    "embedding": {"status": "ready", "detail": "BAAI/bge-m3"},
+    "milvus": {"status": "ready", "detail": "collection=rag_chunks"},
+    "neo4j": {"status": "ready", "detail": "database=neo4j"},
+    "reranker": {"status": "ready", "detail": "keyword"},
+    "llm": {"status": "ready", "detail": "deepseek-chat"}
+  }
 }
 ```
 
@@ -108,9 +134,19 @@ multipart/form-data
       "source": "sample.txt",
       "fusion_score": 0.944
     }
-  ]
+  ],
+  "timings": {
+    "vector_ms": 82.316,
+    "graph_ms": 35.804,
+    "fusion_ms": 0.241,
+    "rerank_ms": 12.518,
+    "llm_ms": 824.731,
+    "total_ms": 956.117
+  }
 }
 ```
+
+`timings` 使用毫秒记录 QA 内部各阶段耗时。`total_ms` 还包含 prompt 构建和结果转换等少量编排开销，因此不要求严格等于其他字段之和。
 
 ## 向量检索接口
 
@@ -282,8 +318,16 @@ multipart/form-data
         "source_evidence_count": "2"
       }
     }
-  ]
+  ],
+  "timings": {
+    "vector_ms": 81.973,
+    "graph_ms": 34.925,
+    "fusion_ms": 0.238,
+    "total_ms": 117.442
+  }
 }
 ```
 
 `fusion_weights` 表示本次请求实际使用的混合检索融合权重，可用于复现实验结果；`score_weight` 越高越依赖原始相关性分数，`rank_weight` 越高越依赖检索排名分。
+
+`timings` 用于区分 Milvus 向量检索、Neo4j 图谱检索、Hybrid Evidence 融合和本次检索总耗时。

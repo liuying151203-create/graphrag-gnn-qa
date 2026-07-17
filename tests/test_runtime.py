@@ -12,12 +12,17 @@ class FakeVectorStore:
         self.options = kwargs
         self.connect_count = 0
         self.close_count = 0
+        self.ping_error: Exception | None = None
 
     def connect(self) -> None:
         self.connect_count += 1
 
     def close(self) -> None:
         self.close_count += 1
+
+    def ping(self) -> None:
+        if self.ping_error is not None:
+            raise self.ping_error
 
     def search(self, query_embedding: list[float], top_k: int = 5) -> list[dict]:
         return []
@@ -27,9 +32,14 @@ class FakeGraphStore:
     def __init__(self, **kwargs) -> None:
         self.options = kwargs
         self.close_count = 0
+        self.ping_error: Exception | None = None
 
     def close(self) -> None:
         self.close_count += 1
+
+    def ping(self) -> None:
+        if self.ping_error is not None:
+            raise self.ping_error
 
     def search_neighbors(self, query: str, top_k: int = 5, max_depth: int = 1) -> list[dict]:
         return []
@@ -137,6 +147,9 @@ def test_build_runtime_resources_shares_retrievers_and_closes_stores(monkeypatch
     assert resources.qa_service.retriever is resources.vector_retriever
     assert resources.qa_service.graph_retriever is resources.graph_retriever
     assert resources.qa_service.reranker is resources.reranker
+    readiness = resources.readiness()
+    assert readiness.status == "ready"
+    assert all(component.status == "ready" for component in readiness.components.values())
 
     resources.close()
 
@@ -155,4 +168,25 @@ def test_build_runtime_resources_keeps_qa_unavailable_without_api_key(monkeypatc
     resources = build_runtime_resources(Settings(llm_api_key="", _env_file=None))
 
     assert resources.qa_service is None
+    readiness = resources.readiness()
+    assert readiness.status == "degraded"
+    assert readiness.components["llm"].status == "not_configured"
+    resources.close()
+
+
+def test_runtime_readiness_sanitizes_component_probe_errors(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "graphrag_gnn_qa.runtime.SentenceTransformerEmbeddingModel",
+        FakeEmbeddingModel,
+    )
+    monkeypatch.setattr("graphrag_gnn_qa.runtime.MilvusVectorStore", FakeVectorStore)
+    monkeypatch.setattr("graphrag_gnn_qa.runtime.Neo4jGraphStore", FakeGraphStore)
+    resources = build_runtime_resources(Settings(llm_api_key="test-key", _env_file=None))
+    resources.vector_store.ping_error = ConnectionError("secret internal address")
+
+    readiness = resources.readiness()
+
+    assert readiness.status == "degraded"
+    assert readiness.components["milvus"].status == "unavailable"
+    assert readiness.components["milvus"].detail == "Readiness check failed: ConnectionError"
     resources.close()
