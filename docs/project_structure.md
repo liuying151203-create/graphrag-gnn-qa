@@ -26,6 +26,7 @@ graphrag-gnn-qa/
 │   ├── api.md
 │   ├── architecture.md
 │   ├── demo_guide.md
+│   ├── development_plan.md
 │   ├── development_workflow.md
 │   ├── experiments.md
 │   ├── graph_schema.md
@@ -810,6 +811,7 @@ graph_dataset.json
 - `api.md`：API 设计
 - `architecture.md`：系统架构设计
 - `demo_guide.md`：演示指南
+- `development_plan.md`：项目后续开发优先级、阶段验收标准和面试演示 Demo 方案
 - `development_workflow.md`：项目开发工作流与个人偏好
 - `graph_schema.md`：知识图谱 Schema 设计
 - `experiments.md`：实验设计

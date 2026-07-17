@@ -35,6 +35,7 @@
 - [知识图谱 Schema 设计](docs/graph_schema.md)
 - [实验设计](docs/experiments.md)
 - [演示指南](docs/demo_guide.md)
+- [项目后续开发与演示 Demo 计划](docs/development_plan.md)
 - [面试与简历说明](docs/interview_notes.md)
 - [项目结构说明](docs/project_structure.md)
 - [项目开发工作流与个人偏好](docs/development_workflow.md)
