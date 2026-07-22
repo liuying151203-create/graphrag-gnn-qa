@@ -247,17 +247,24 @@ Demo 必须考虑面试现场网络不稳定：
 
 优先级：高。
 
+当前状态：Phase 2A 已完成。
+
+- [x] Phase 2A：同步上传、稳定内容 ID、重复检测、Milvus upsert、Neo4j MERGE 和阶段错误。
+- [ ] Phase 2B：按文档删除、覆盖重建、孤立实体清理和 Demo 上传入口。
+- [ ] Phase 2C：后台任务、pending/processing 状态和进度查询。
+
 目标：把命令行脚本整理为可复用服务，实现 `POST /documents/upload`。
 
 主要任务：
 
-- 抽取 `DocumentIngestionService`，统一解析、切分、Embedding、图谱抽取和写库流程。
-- 设计稳定的 `document_id`，增加文件 hash 和重复上传检测。
-- Milvus 支持按主键 upsert，并支持按 `document_id` 删除。
-- Neo4j 支持按文档清理关系，并安全处理孤立实体。
-- 增加入库状态：pending、processing、completed、partial_failed、failed。
-- 第一版支持单文档同步上传；稳定后再引入后台任务和进度查询。
-- Demo 增加上传入口，但预设问题仍使用预构建数据保证稳定。
+- [x] 抽取 `DocumentIngestionService`，统一解析、切分、Embedding、图谱抽取和写库流程。
+- [x] 使用文件内容 SHA-256 设计稳定 `document_id`，增加重复上传检测。
+- [x] Milvus 支持按稳定 chunk 主键 upsert。
+- [x] 第一版支持单文档同步上传，并返回 completed、failed、partial_failed 和分阶段耗时。
+- [ ] Milvus 支持按 `document_id` 删除。
+- [ ] Neo4j 支持按文档清理关系，并安全处理孤立实体。
+- [ ] Demo 增加上传入口，但预设问题仍使用预构建数据保证稳定。
+- [ ] 稳定同步流程后再引入后台任务、pending/processing 状态和进度查询。
 
 验收：
 
@@ -265,6 +272,8 @@ Demo 必须考虑面试现场网络不稳定：
 - 重复上传不会制造重复 chunk 和关系。
 - 任一步骤失败会返回阶段、错误信息和已完成统计。
 - 能删除文档并清理对应向量与图谱证据。
+
+Phase 2A 已通过服务和 API 自动化测试；真实 BGE、LLM、Milvus 与 Neo4j 的上传后立即检索验收需要在项目基础服务启动后执行。
 
 ### Phase 3：Rerank、融合与引用质量
 

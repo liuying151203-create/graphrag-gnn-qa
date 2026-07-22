@@ -74,11 +74,12 @@ Neo4j 知识图谱
 - `POST /graph/retrieve`：Neo4j 图谱邻域检索接口
 - `POST /retrieval/debug`：向量、图谱和混合检索调试接口
 - `POST /qa/ask`：GraphRAG-aware 问答接口
+- `POST /documents/upload`：单文档同步解析、切分、Embedding、图谱抽取和双库写入
 - FastAPI lifespan：应用启动时初始化运行时资源，关闭时释放 Milvus 和 Neo4j 连接
 
 待实现：
 
-- `POST /documents/upload`：文档上传并触发解析、切分、向量写入和图谱写入的端到端导入接口
+- 文档删除、强制覆盖、后台入库任务和进度查询接口
 
 ### 运行时资源层
 
@@ -86,10 +87,10 @@ Neo4j 知识图谱
 
 当前已实现：
 
-- `RuntimeResources`：统一持有 Embedding、Milvus、Neo4j、VectorRetriever、GraphRetriever、Reranker 和 QA 服务
+- `RuntimeResources`：统一持有 Embedding、Milvus、Neo4j、VectorRetriever、GraphRetriever、Reranker、QA 和文档入库服务
 - `build_runtime_resources`：按应用生命周期初始化资源，避免每次请求重复加载模型或创建数据库客户端
 - API 依赖从 `app.state.runtime_resources` 获取共享实例
-- 未配置 `LLM_API_KEY` 时保留检索能力，`/qa/ask` 明确返回 503
+- 未配置 `LLM_API_KEY` 时保留检索能力，`/qa/ask` 和 `/documents/upload` 明确返回 503
 - 应用关闭时同时释放 Neo4j driver 和 Milvus connection
 - `RuntimeResources.readiness`：执行 Milvus 和 Neo4j 探针，并汇总模型、Reranker 与 LLM 配置状态
 - 就绪探针失败时返回脱敏的组件状态，不返回内部连接异常详情
@@ -105,6 +106,7 @@ Neo4j 知识图谱
 - 融合权重非负且不能同时为零的校验
 - `RERANKER_TYPE` 可配置为 `keyword` 或 `bge`
 - `RERANK_TOP_K` 可配置，并要求大于等于 1
+- 文档大小、入库 chunk 参数和 Embedding batch size 可配置，并校验 overlap 小于 chunk size
 
 ### 文档处理层
 
@@ -113,8 +115,11 @@ Neo4j 知识图谱
 当前已实现：
 
 - `DocumentLoader`：文档读取
+- `DocumentLoader.load_bytes`：直接解析上传字节，文件名经过规范化，不落临时文件
 - `TextSplitter`：固定长度重叠文本切分
+- `DocumentIngestionService`：统一编排重复检测、解析、切分、Embedding、图谱抽取和双库写入
 - `scripts/ingest_documents.py`：生成 `data/processed/chunks.jsonl`
+- `POST /documents/upload`：同步单文档入库，返回数量、状态和分阶段耗时
 
 ### 向量检索层
 
@@ -125,6 +130,8 @@ Neo4j 知识图谱
 - Embedding 模型抽象和 hash embedding 测试实现
 - `scripts/embed_chunks.py`：生成 chunk embeddings
 - `scripts/load_embeddings_to_milvus.py`：写入 Milvus
+- `MilvusVectorStore.document_exists`：按稳定文档 ID 检测重复内容
+- `MilvusVectorStore.upsert_records`：按稳定 chunk 主键幂等写入上传文档
 - `VectorRetriever`：基于向量库的文本块检索
 - `scripts/search_chunks.py`：命令行检索脚本
 - `POST /retrieve`：向量检索 API
@@ -223,6 +230,7 @@ Neo4j 知识图谱
 - LLM 实体关系抽取
 - GraphRAG 混合检索证据建模、融合排序和去重
 - `/retrieve`、`/graph/retrieve`、`/retrieval/debug`、`/qa/ask` API
+- `/documents/upload` 同步入库 API、内容哈希、重复检测和结构化阶段错误
 - GraphRAG Context Builder 和 QA citations
 - 可配置 fusion 权重
 - 可配置 Rerank，用于 QA prompt 和 citations 前的二阶段证据排序
@@ -236,11 +244,11 @@ Neo4j 知识图谱
 - 实验数据集：已有样例问题集和 20 条小规模 dev set，尚未扩展为更稳定、更贴近真实文档的评估集
 - Rerank：已接入轻量规则 rerank 和可配置 BGE Reranker，仍需补充消融评估
 - GNN：已完成图结构导出，尚未完成节点特征构造、GAT 训练和 GNN 辅助召回
-- 文档导入：已有命令行数据构建流程，尚未提供上传 API
+- 文档导入：同步上传、稳定 ID 和幂等写入已实现，尚未提供删除、覆盖重建、后台任务和进度查询
 
 ### 待实现
 
-- `POST /documents/upload` 文档上传与端到端索引构建 API
+- 文档删除、覆盖重建、后台入库任务和进度查询 API
 - GNN 节点特征构造、GAT 训练、节点向量写入和 GNN 辅助召回
 - BGE Reranker、rerank/no-rerank 和不同 reranker 类型的消融评估
 - 更完整的实验对比报告和消融实验

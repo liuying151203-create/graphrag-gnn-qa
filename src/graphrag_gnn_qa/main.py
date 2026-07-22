@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from graphrag_gnn_qa.api.routes_debug import router as debug_router
+from graphrag_gnn_qa.api.routes_documents import router as documents_router
 from graphrag_gnn_qa.api.routes_graph import router as graph_router
 from graphrag_gnn_qa.api.routes_health import router as health_router
 from graphrag_gnn_qa.api.routes_qa import router as qa_router
@@ -37,6 +38,7 @@ def create_app(runtime_factory: RuntimeFactory = build_runtime_resources) -> Fas
         lifespan=lifespan,
     )
     app.include_router(health_router)
+    app.include_router(documents_router)
     app.include_router(retrieve_router)
     app.include_router(graph_router)
     app.include_router(debug_router)

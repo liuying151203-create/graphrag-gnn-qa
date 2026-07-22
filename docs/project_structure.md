@@ -62,6 +62,7 @@ graphrag-gnn-qa/
 │       │   ├── __init__.py
 │       │   ├── dependencies.py
 │       │   ├── routes_debug.py
+│       │   ├── routes_documents.py
 │       │   ├── routes_graph.py
 │       │   ├── routes_health.py
 │       │   ├── routes_qa.py
@@ -76,6 +77,7 @@ graphrag-gnn-qa/
 │       ├── ingestion/
 │       │   ├── __init__.py
 │       │   ├── document_loader.py
+│       │   ├── service.py
 │       │   └── text_splitter.py
 │       ├── llm/
 │       │   ├── __init__.py
@@ -102,7 +104,9 @@ graphrag-gnn-qa/
 │   ├── test_config.py
 │   ├── test_demo_api_client.py
 │   ├── test_demo_components.py
+│   ├── test_documents_api.py
 │   ├── test_document_loader.py
+│   ├── test_ingestion_service.py
 │   ├── test_context_builder.py
 │   ├── test_debug_api.py
 │   ├── test_embed_chunks.py
@@ -205,17 +209,18 @@ POST /retrieve
 POST /graph/retrieve
 POST /retrieval/debug
 POST /qa/ask
+POST /documents/upload
 ```
 
 ### `runtime.py`
 
-应用级运行时资源模块，统一初始化和复用 Embedding、Milvus、Neo4j、VectorRetriever、GraphRetriever、Reranker 和 QA 服务，负责组件就绪检查和数据库连接关闭。
+应用级运行时资源模块，统一初始化和复用 Embedding、Milvus、Neo4j、VectorRetriever、GraphRetriever、Reranker、QA 和文档入库服务，负责组件就绪检查和数据库连接关闭。
 
 ### `config.py`
 
 配置管理模块，基于 `pydantic-settings` 从 `.env` 读取配置。
 
-Neo4j、Milvus、LLM、Embedding、TopK、hybrid fusion 权重、rerank 类型和 rerank 参数等都会统一从这里读取。
+Neo4j、Milvus、LLM、Embedding、TopK、hybrid fusion 权重、rerank 参数、上传大小和入库切分参数等都会统一从这里读取。
 
 ### `api/`
 
@@ -226,6 +231,7 @@ API 路由目录。
 - `dependencies.py`：从 FastAPI `app.state` 获取应用级运行时资源
 - `routes_health.py`：健康检查接口
 - `routes_debug.py`：检索调试接口
+- `routes_documents.py`：同步文档上传和入库接口
 - `routes_graph.py`：图谱检索接口
 - `routes_qa.py`：问答接口
 - `routes_retrieve.py`：向量检索接口
@@ -240,6 +246,16 @@ API 路由目录。
 GET /health
 GET /ready
 ```
+
+#### `routes_documents.py`
+
+提供同步文档上传 API：
+
+```text
+POST /documents/upload
+```
+
+负责 multipart 文件大小限制、依赖检查、线程池调用、响应模型转换，以及重复、文档校验和阶段失败的 HTTP 错误映射。
 
 #### `routes_retrieve.py`
 
@@ -296,6 +312,7 @@ POST /qa/ask
 当前包含：
 
 - `document_loader.py`
+- `service.py`
 - `text_splitter.py`
 
 #### `document_loader.py`
@@ -325,6 +342,18 @@ POST /qa/ask
 - `content`：文本块内容
 - `start_index`：在原文中的起始位置
 - `end_index`：在原文中的结束位置
+
+#### `service.py`
+
+`DocumentIngestionService` 负责同步入库编排：
+
+- 使用内容 SHA-256 生成稳定 `document_id`
+- 检测重复内容
+- 解析和切分上传字节
+- 分批生成 Embedding
+- 调用 LLM 抽取实体关系
+- 使用 Neo4j MERGE 和 Milvus upsert 写入
+- 返回数量统计、阶段耗时和结构化失败阶段
 
 ### `graph/`
 
@@ -865,6 +894,8 @@ graph_dataset.json
 当前测试覆盖：
 
 - FastAPI 健康检查接口
+- 文档上传 API 的成功、重复、大小、类型和阶段错误契约
+- 文档入库服务的稳定 ID、双库写入顺序、重复检测和部分失败
 - Demo API 客户端、预设问题、数据统计、方法对比和图谱 DOT 构造
 - 文档读取模块
 - 文本切分模块

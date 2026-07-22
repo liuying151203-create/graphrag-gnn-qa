@@ -147,6 +147,9 @@ def test_build_runtime_resources_shares_retrievers_and_closes_stores(monkeypatch
     assert resources.qa_service.retriever is resources.vector_retriever
     assert resources.qa_service.graph_retriever is resources.graph_retriever
     assert resources.qa_service.reranker is resources.reranker
+    assert resources.ingestion_service is not None
+    assert resources.ingestion_service.embedding_model is resources.vector_retriever.embedding_model
+    assert resources.ingestion_service.graph_extractor.llm_client is resources.qa_service.llm_client
     readiness = resources.readiness()
     assert readiness.status == "ready"
     assert all(component.status == "ready" for component in readiness.components.values())
@@ -168,6 +171,7 @@ def test_build_runtime_resources_keeps_qa_unavailable_without_api_key(monkeypatc
     resources = build_runtime_resources(Settings(llm_api_key="", _env_file=None))
 
     assert resources.qa_service is None
+    assert resources.ingestion_service is None
     readiness = resources.readiness()
     assert readiness.status == "degraded"
     assert readiness.components["llm"].status == "not_configured"

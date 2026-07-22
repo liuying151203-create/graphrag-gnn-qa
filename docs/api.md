@@ -46,9 +46,9 @@
 
 ### `POST /documents/upload`
 
-计划用于上传文档并触发解析、切分、实体关系抽取、向量写入和图谱写入。
+上传单个文档并同步执行解析、切分、Embedding、实体关系抽取、Neo4j 写入和 Milvus 写入。
 
-当前状态：待实现。
+当前状态：已实现同步 MVP。
 
 请求形式：
 
@@ -56,17 +56,79 @@
 multipart/form-data
 ```
 
-计划响应：
+字段：
+
+- `file`：必填，支持 TXT、Markdown 和 PDF。
+- 默认大小上限为 20 MiB，可通过 `DOCUMENT_UPLOAD_MAX_BYTES` 调整。
+- 当前完整入库依赖 LLM 图谱抽取，因此未配置 `LLM_API_KEY` 时返回 HTTP 503。
+
+调用示例：
+
+```powershell
+curl.exe -X POST http://127.0.0.1:8000/documents/upload -F "file=@data/raw/sample.txt"
+```
+
+处理语义：
+
+- 使用文件内容 SHA-256 生成稳定的 `document_id`，同一内容即使文件名不同也具有相同 ID。
+- 在数据库写入前完成解析、切分、Embedding 和图谱抽取，减少外部模型失败造成的半入库。
+- Neo4j 使用实体和关系 MERGE，Milvus 使用稳定 chunk 主键 upsert。
+- 已存在相同内容时返回 HTTP 409，不重复生成 chunk 或关系。
+- 成功后立即可以通过现有检索和问答接口查询。
+
+成功响应为 HTTP 201：
 
 ```json
 {
-  "document_id": "doc_xxx",
-  "filename": "example.pdf",
-  "chunk_count": 32,
-  "entity_count": 48,
-  "relation_count": 76
+  "status": "completed",
+  "document_id": "doc_6d00a60f9e5194d777ba7b4a8c585768",
+  "content_sha256": "6d00a60f9e5194d777ba7b4a8c585768d8b28bdb8f4a91f662d1a67f22d7b432",
+  "filename": "sample.txt",
+  "file_type": "txt",
+  "chunk_count": 5,
+  "embedding_count": 5,
+  "entity_count": 18,
+  "relation_count": 16,
+  "timings": {
+    "parse_ms": 0.121,
+    "chunk_ms": 0.084,
+    "embedding_ms": 164.532,
+    "graph_extraction_ms": 3821.774,
+    "vector_write_ms": 92.614,
+    "graph_write_ms": 104.527,
+    "total_ms": 4184.102
+  }
 }
 ```
+
+主要错误：
+
+- HTTP 409：`duplicate_document`，相同内容已存在。
+- HTTP 413：`document_too_large`，超过配置的上传大小。
+- HTTP 415：`unsupported_document_type`。
+- HTTP 422：空文件、无可提取文本、非 UTF-8 文本等文档校验失败。
+- HTTP 502：上游 LLM 请求失败。
+- HTTP 503：运行时未配置、Milvus/Neo4j 写入失败或重复检查不可用。
+
+阶段失败响应会返回 `failed` 或 `partial_failed`、失败阶段和 `document_id`，但不会暴露数据库地址、密钥或原始异常正文：
+
+```json
+{
+  "detail": {
+    "code": "ingestion_stage_failed",
+    "status": "partial_failed",
+    "stage": "graph_write",
+    "document_id": "doc_6d00a60f9e5194d777ba7b4a8c585768",
+    "message": "Document ingestion failed during graph_write"
+  }
+}
+```
+
+当前限制：
+
+- 仅支持同步单文档上传，调用方需要等待全流程完成。
+- 尚未提供文档删除、强制覆盖、任务进度查询和后台队列。
+- 数据库写入不具备跨 Milvus 与 Neo4j 的分布式事务；接口通过写入顺序、稳定主键和结构化 `partial_failed` 状态降低并暴露该风险。
 
 ## 问答接口
 

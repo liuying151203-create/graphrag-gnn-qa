@@ -129,6 +129,32 @@ class MilvusVectorStore:
         collection.flush()
         return int(mutation_result.insert_count)
 
+    def upsert_records(self, records: list[EmbeddingRecord]) -> int:
+        if not records:
+            return 0
+
+        from pymilvus import Collection
+
+        collection = Collection(name=self.collection_name, using=self.alias)
+        mutation_result = collection.upsert(prepare_insert_columns(records))
+        collection.flush()
+        upsert_count = getattr(mutation_result, "upsert_count", None)
+        return int(upsert_count if upsert_count is not None else len(records))
+
+    def document_exists(self, document_id: str) -> bool:
+        from pymilvus import Collection, utility
+
+        if not utility.has_collection(self.collection_name, using=self.alias):
+            return False
+        collection = Collection(name=self.collection_name, using=self.alias)
+        collection.load()
+        records = collection.query(
+            expr=f'document_id == "{document_id}"',
+            output_fields=["chunk_id"],
+            limit=1,
+        )
+        return bool(records)
+
     def search(self, query_embedding: list[float], top_k: int = 5) -> list[dict[str, Any]]:
         from pymilvus import Collection
 

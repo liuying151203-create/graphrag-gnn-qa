@@ -44,3 +44,26 @@ def test_settings_accepts_bge_reranker_type() -> None:
 def test_settings_rejects_invalid_reranker_type() -> None:
     with pytest.raises(ValidationError):
         Settings(reranker_type="cross_encoder", _env_file=None)
+
+
+def test_settings_default_document_ingestion_options() -> None:
+    settings = Settings(_env_file=None)
+
+    assert settings.document_upload_max_bytes == 20 * 1024 * 1024
+    assert settings.ingestion_chunk_size == 800
+    assert settings.ingestion_chunk_overlap == 120
+    assert settings.ingestion_embedding_batch_size == 16
+
+
+def test_settings_rejects_invalid_ingestion_chunk_overlap() -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            ingestion_chunk_size=100,
+            ingestion_chunk_overlap=100,
+            _env_file=None,
+        )
+
+
+def test_settings_rejects_chunk_size_larger_than_milvus_field() -> None:
+    with pytest.raises(ValidationError):
+        Settings(ingestion_chunk_size=8193, _env_file=None)

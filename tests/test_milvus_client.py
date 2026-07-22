@@ -110,3 +110,77 @@ def test_milvus_store_connect_ping_and_close(monkeypatch) -> None:
         ("ping", {"using": "runtime"}),
         ("disconnect", "runtime"),
     ]
+
+
+def test_milvus_store_upserts_records(monkeypatch) -> None:
+    calls = []
+
+    class MutationResult:
+        upsert_count = 2
+
+    class FakeCollection:
+        def __init__(self, **kwargs) -> None:
+            calls.append(("collection", kwargs))
+
+        def upsert(self, columns):
+            calls.append(("upsert", columns))
+            return MutationResult()
+
+        def flush(self) -> None:
+            calls.append(("flush", None))
+
+    monkeypatch.setattr("pymilvus.Collection", FakeCollection)
+    records = [
+        EmbeddingRecord("chunk_1", "doc", "content 1", "source", "file.txt", "txt", [0.1, 0.2]),
+        EmbeddingRecord("chunk_2", "doc", "content 2", "source", "file.txt", "txt", [0.3, 0.4]),
+    ]
+    store = MilvusVectorStore(collection_name="chunks", alias="runtime")
+
+    count = store.upsert_records(records)
+
+    assert count == 2
+    assert calls[0] == ("collection", {"name": "chunks", "using": "runtime"})
+    assert calls[1] == ("upsert", prepare_insert_columns(records))
+    assert calls[2] == ("flush", None)
+
+
+def test_milvus_store_checks_document_exists(monkeypatch) -> None:
+    calls = []
+
+    class FakeCollection:
+        def __init__(self, **kwargs) -> None:
+            calls.append(("collection", kwargs))
+
+        def load(self) -> None:
+            calls.append(("load", None))
+
+        def query(self, **kwargs):
+            calls.append(("query", kwargs))
+            return [{"chunk_id": "chunk_1"}]
+
+    monkeypatch.setattr("pymilvus.utility.has_collection", lambda *args, **kwargs: True)
+    monkeypatch.setattr("pymilvus.Collection", FakeCollection)
+    store = MilvusVectorStore(collection_name="chunks", alias="runtime")
+
+    exists = store.document_exists("doc_123")
+
+    assert exists is True
+    assert calls == [
+        ("collection", {"name": "chunks", "using": "runtime"}),
+        ("load", None),
+        (
+            "query",
+            {
+                "expr": 'document_id == "doc_123"',
+                "output_fields": ["chunk_id"],
+                "limit": 1,
+            },
+        ),
+    ]
+
+
+def test_milvus_store_reports_missing_document_when_collection_is_absent(monkeypatch) -> None:
+    monkeypatch.setattr("pymilvus.utility.has_collection", lambda *args, **kwargs: False)
+    store = MilvusVectorStore(collection_name="chunks")
+
+    assert store.document_exists("doc_123") is False

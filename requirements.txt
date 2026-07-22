@@ -4,6 +4,7 @@ uvicorn[standard]
 pydantic
 pydantic-settings
 pypdf
+python-multipart
 python-dotenv
 langchain
 langchain-community

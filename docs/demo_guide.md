@@ -131,7 +131,7 @@ python scripts/load_graph_to_neo4j.py
 5. 打开 citation，追溯到文档 chunk。
 6. 在 Graph Results 和 Graph View 中解释实体关系与邻域检索。
 7. 用耗时图说明检索、重排和 LLM 的性能瓶颈。
-8. 最后说明快照降级、当前评估边界和下一阶段文档上传计划。
+8. 最后说明快照降级、当前评估边界、已实现的同步上传 API 和后续文档生命周期计划。
 
 面试现场不建议执行全量 PDF embedding 或 LLM 图谱抽取，这些步骤耗时较长并依赖外部服务。
 

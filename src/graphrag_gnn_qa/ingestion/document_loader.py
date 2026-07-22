@@ -1,3 +1,4 @@
+from io import BytesIO
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -18,26 +19,44 @@ class DocumentLoader:
         if not path.exists():
             raise FileNotFoundError(f"Document not found: {path}")
 
-        suffix = path.suffix.lower()
+        return self.load_bytes(
+            content=path.read_bytes(),
+            file_name=path.name,
+            source=str(path),
+        )
+
+    def load_bytes(
+        self,
+        content: bytes,
+        file_name: str,
+        source: str | None = None,
+    ) -> LoadedDocument:
+        suffix = Path(file_name).suffix.lower()
         if suffix not in self.supported_extensions:
             raise ValueError(f"Unsupported document type: {suffix}")
 
         if suffix == ".pdf":
-            content = self._load_pdf(path)
+            try:
+                text = self._load_pdf(content)
+            except Exception as exc:
+                raise ValueError("Failed to parse PDF document") from exc
         else:
-            content = path.read_text(encoding="utf-8")
+            try:
+                text = content.decode("utf-8-sig")
+            except UnicodeDecodeError as exc:
+                raise ValueError("Text documents must use UTF-8 encoding") from exc
 
         return LoadedDocument(
-            content=content.strip(),
-            source=str(path),
-            file_name=path.name,
+            content=text.strip(),
+            source=source or file_name,
+            file_name=file_name,
             file_type=suffix.lstrip("."),
         )
 
-    def _load_pdf(self, path: Path) -> str:
+    def _load_pdf(self, content: bytes) -> str:
         from pypdf import PdfReader
 
-        reader = PdfReader(str(path))
+        reader = PdfReader(BytesIO(content))
         pages = []
         for page in reader.pages:
             text = page.extract_text() or ""

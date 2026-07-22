@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     fusion_score_weight: float = Field(default=DEFAULT_FUSION_SCORE_WEIGHT, ge=0)
     fusion_rank_weight: float = Field(default=DEFAULT_FUSION_RANK_WEIGHT, ge=0)
 
+    document_upload_max_bytes: int = Field(default=20 * 1024 * 1024, ge=1)
+    ingestion_chunk_size: int = Field(default=800, ge=1, le=8192)
+    ingestion_chunk_overlap: int = Field(default=120, ge=0)
+    ingestion_embedding_batch_size: int = Field(default=16, ge=1)
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     @model_validator(mode="after")
@@ -53,6 +58,12 @@ class Settings(BaseSettings):
     def validate_reranker_type(self) -> "Settings":
         if self.reranker_type not in {"keyword", "bge"}:
             raise ValueError("reranker_type must be one of: keyword, bge")
+        return self
+
+    @model_validator(mode="after")
+    def validate_ingestion_chunking(self) -> "Settings":
+        if self.ingestion_chunk_overlap >= self.ingestion_chunk_size:
+            raise ValueError("ingestion_chunk_overlap must be smaller than ingestion_chunk_size")
         return self
 
 

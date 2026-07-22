@@ -3,8 +3,10 @@ from dataclasses import dataclass
 from typing import Literal
 
 from graphrag_gnn_qa.config import Settings
+from graphrag_gnn_qa.graph.extractor import GraphExtractor
 from graphrag_gnn_qa.graph.neo4j_store import Neo4jGraphStore
-from graphrag_gnn_qa.llm.client import OpenAICompatibleLLMClient
+from graphrag_gnn_qa.ingestion.service import DocumentIngestionService
+from graphrag_gnn_qa.llm.client import LLMClient, OpenAICompatibleLLMClient
 from graphrag_gnn_qa.rag.qa_service import RAGQAService
 from graphrag_gnn_qa.rerank import (
     BGEEvidenceReranker,
@@ -14,7 +16,7 @@ from graphrag_gnn_qa.rerank import (
 from graphrag_gnn_qa.rerank.evidence_reranker import EvidenceReranker
 from graphrag_gnn_qa.retrieval.graph_retriever import GraphRetriever
 from graphrag_gnn_qa.retrieval.vector_retriever import VectorRetriever
-from graphrag_gnn_qa.vectorstore.embedding import SentenceTransformerEmbeddingModel
+from graphrag_gnn_qa.vectorstore.embedding import EmbeddingModel, SentenceTransformerEmbeddingModel
 from graphrag_gnn_qa.vectorstore.milvus_client import MilvusVectorStore
 
 ComponentReadinessStatus = Literal["ready", "unavailable", "not_configured"]
@@ -30,6 +32,7 @@ class RuntimeResources:
     graph_retriever: GraphRetriever
     reranker: EvidenceReranker
     qa_service: RAGQAService | None
+    ingestion_service: DocumentIngestionService | None
 
     def close(self) -> None:
         try:
@@ -105,11 +108,20 @@ def build_runtime_resources(settings: Settings) -> RuntimeResources:
         vector_retriever = VectorRetriever(embedding_model=embedding_model, vector_store=vector_store)
         graph_retriever = GraphRetriever(graph_store=graph_store)
         reranker = build_evidence_reranker(settings)
+        llm_client = _build_llm_client(settings)
         qa_service = _build_qa_service(
             settings=settings,
             vector_retriever=vector_retriever,
             graph_retriever=graph_retriever,
             reranker=reranker,
+            llm_client=llm_client,
+        )
+        ingestion_service = _build_ingestion_service(
+            settings=settings,
+            embedding_model=embedding_model,
+            vector_store=vector_store,
+            graph_store=graph_store,
+            llm_client=llm_client,
         )
         return RuntimeResources(
             settings=settings,
@@ -119,6 +131,7 @@ def build_runtime_resources(settings: Settings) -> RuntimeResources:
             graph_retriever=graph_retriever,
             reranker=reranker,
             qa_service=qa_service,
+            ingestion_service=ingestion_service,
         )
     except Exception:
         try:
@@ -134,15 +147,11 @@ def _build_qa_service(
     vector_retriever: VectorRetriever,
     graph_retriever: GraphRetriever,
     reranker: EvidenceReranker,
+    llm_client: LLMClient | None,
 ) -> RAGQAService | None:
-    if not settings.llm_api_key:
+    if llm_client is None:
         return None
 
-    llm_client = OpenAICompatibleLLMClient(
-        api_key=settings.llm_api_key,
-        base_url=settings.llm_base_url,
-        model=settings.llm_model,
-    )
     return RAGQAService(
         retriever=vector_retriever,
         llm_client=llm_client,
@@ -153,6 +162,36 @@ def _build_qa_service(
         fusion_rank_weight=settings.fusion_rank_weight,
         reranker=reranker,
         rerank_top_k=settings.rerank_top_k,
+    )
+
+
+def _build_llm_client(settings: Settings) -> LLMClient | None:
+    if not settings.llm_api_key:
+        return None
+    return OpenAICompatibleLLMClient(
+        api_key=settings.llm_api_key,
+        base_url=settings.llm_base_url,
+        model=settings.llm_model,
+    )
+
+
+def _build_ingestion_service(
+    settings: Settings,
+    embedding_model: EmbeddingModel,
+    vector_store: MilvusVectorStore,
+    graph_store: Neo4jGraphStore,
+    llm_client: LLMClient | None,
+) -> DocumentIngestionService | None:
+    if llm_client is None:
+        return None
+    return DocumentIngestionService(
+        embedding_model=embedding_model,
+        vector_store=vector_store,
+        graph_extractor=GraphExtractor(llm_client=llm_client),
+        graph_store=graph_store,
+        chunk_size=settings.ingestion_chunk_size,
+        chunk_overlap=settings.ingestion_chunk_overlap,
+        embedding_batch_size=settings.ingestion_embedding_batch_size,
     )
 
 

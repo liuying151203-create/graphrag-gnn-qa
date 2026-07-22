@@ -22,3 +22,24 @@ def test_load_unsupported_document_type(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError):
         DocumentLoader().load(file_path)
+
+
+def test_load_text_document_from_bytes() -> None:
+    document = DocumentLoader().load_bytes(
+        content=b"\xef\xbb\xbfGraphRAG content",
+        file_name="uploaded.md",
+    )
+
+    assert document.content == "GraphRAG content"
+    assert document.source == "uploaded.md"
+    assert document.file_type == "md"
+
+
+def test_load_bytes_rejects_non_utf8_text() -> None:
+    with pytest.raises(ValueError, match="UTF-8"):
+        DocumentLoader().load_bytes(content=b"\xff\xfe", file_name="uploaded.txt")
+
+
+def test_load_bytes_rejects_invalid_pdf() -> None:
+    with pytest.raises(ValueError, match="Failed to parse PDF"):
+        DocumentLoader().load_bytes(content=b"not a pdf", file_name="uploaded.pdf")

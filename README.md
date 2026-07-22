@@ -117,6 +117,16 @@ python -m streamlit run demo/app.py --server.address 127.0.0.1 --server.port 850
 
 访问 `http://127.0.0.1:8501`。FastAPI 未启动时，页面会明确显示服务不可用，并使用仓库内的样例快照展示完整交互结构；实时演示流程见 [演示指南](docs/demo_guide.md)。
 
+### 上传并入库文档
+
+FastAPI、Milvus、Neo4j 和 LLM 均就绪后，可同步上传 TXT、Markdown 或 PDF：
+
+```powershell
+curl.exe -X POST http://127.0.0.1:8000/documents/upload -F "file=@data/raw/sample.txt"
+```
+
+接口使用内容 SHA-256 生成稳定 `document_id`，并完成切分、Embedding、图谱抽取和双库写入。默认文件上限为 20 MiB，重复内容返回 HTTP 409；详细契约见 [API 设计](docs/api.md)。
+
 ## 当前已实现能力
 
 - Streamlit GraphRAG 演示工作台，支持服务状态、预设问题、方法对比、引用追溯、阶段耗时和局部图谱视图
@@ -134,6 +144,7 @@ python -m streamlit run demo/app.py --server.address 127.0.0.1 --server.port 850
 - `POST /graph/retrieve` 图谱检索 API
 - `POST /retrieval/debug` 检索调试 API
 - `POST /qa/ask` GraphRAG-aware 问答 API
+- `POST /documents/upload` 同步文档入库 API，支持内容哈希、重复检测、Milvus upsert、Neo4j MERGE 和阶段耗时
 - 检索和问答分阶段耗时，覆盖 vector、graph、fusion、rerank 和 LLM
 - GraphRAG Context Builder，用于统一组织向量上下文、图谱上下文、混合证据上下文和 LLM prompt
 - Hybrid Retrieval Result Model，用于统一表示、融合排序并去重向量证据和图谱证据
