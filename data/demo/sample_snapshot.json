@@ -1,0 +1,178 @@
+{
+  "question": "What is GraphRAG?",
+  "snapshot": true,
+  "stale": false,
+  "errors": [],
+  "client_latencies": {
+    "retrieval_debug_ms": 112.4,
+    "qa_ms": 986.2
+  },
+  "retrieval_debug": {
+    "query": "What is GraphRAG?",
+    "vector_top_k": 3,
+    "graph_top_k": 5,
+    "graph_max_depth": 2,
+    "fusion_weights": {
+      "score_weight": 0.7,
+      "rank_weight": 0.3
+    },
+    "timings": {
+      "vector_ms": 68.4,
+      "graph_ms": 42.8,
+      "fusion_ms": 0.3,
+      "total_ms": 111.8
+    },
+    "graph_query_terms": [
+      "What is GraphRAG?",
+      "GraphRAG"
+    ],
+    "vector_results": [
+      {
+        "score": 0.93,
+        "chunk_id": "sample_chunk_0001",
+        "document_id": "sample",
+        "content": "GraphRAG combines vector search and graph traversal. Vector search retrieves textual evidence from document chunks, while graph traversal retrieves structured relational paths from a Neo4j knowledge graph.",
+        "source": "sample.txt",
+        "file_name": "sample.txt",
+        "file_type": "txt"
+      },
+      {
+        "score": 0.88,
+        "chunk_id": "sample_chunk_0000",
+        "document_id": "sample",
+        "content": "GraphRAG reduces information fragmentation by combining textual evidence with structured relational paths.",
+        "source": "sample.txt",
+        "file_name": "sample.txt",
+        "file_type": "txt"
+      }
+    ],
+    "graph_results": [
+      {
+        "center_id": "Method:graphrag",
+        "center_name": "GraphRAG",
+        "center_type": "Method",
+        "source_id": "Method:graphrag",
+        "source_name": "GraphRAG",
+        "source_type": "Method",
+        "relation_type": "USES_METHOD",
+        "target_id": "Method:vector search",
+        "target_name": "Vector search",
+        "target_type": "Method",
+        "chunk_id": "sample_chunk_0001",
+        "document_id": "sample",
+        "source": "sample.txt",
+        "evidence": "GraphRAG combines vector search and graph traversal.",
+        "confidence": 0.9
+      },
+      {
+        "center_id": "Method:graphrag",
+        "center_name": "GraphRAG",
+        "center_type": "Method",
+        "source_id": "Method:graphrag",
+        "source_name": "GraphRAG",
+        "source_type": "Method",
+        "relation_type": "USES_METHOD",
+        "target_id": "Method:graph traversal",
+        "target_name": "Graph traversal",
+        "target_type": "Method",
+        "chunk_id": "sample_chunk_0001",
+        "document_id": "sample",
+        "source": "sample.txt",
+        "evidence": "GraphRAG combines vector search and graph traversal.",
+        "confidence": 0.9
+      },
+      {
+        "center_id": "Method:graphrag",
+        "center_name": "GraphRAG",
+        "center_type": "Method",
+        "source_id": "Method:graphrag",
+        "source_name": "GraphRAG",
+        "source_type": "Method",
+        "relation_type": "SOLVES_TASK",
+        "target_id": "Task:information fragmentation",
+        "target_name": "Information fragmentation",
+        "target_type": "Task",
+        "chunk_id": "sample_chunk_0000",
+        "document_id": "sample",
+        "source": "sample.txt",
+        "evidence": "GraphRAG is designed to solve the information fragmentation problem in traditional RAG systems.",
+        "confidence": 0.9
+      }
+    ],
+    "hybrid_results": [
+      {
+        "evidence_id": "V1+G1+G2",
+        "evidence_type": "hybrid",
+        "rank": 1,
+        "score": 0.93,
+        "fusion_score": 0.965,
+        "document_id": "sample",
+        "chunk_id": "sample_chunk_0001",
+        "source": "sample.txt",
+        "content": "GraphRAG combines vector search and graph traversal. Vector search retrieves textual evidence from document chunks, while graph traversal retrieves structured relational paths from a Neo4j knowledge graph.",
+        "metadata": {
+          "evidence_ids": "V1,G1,G2",
+          "evidence_types": "vector_chunk,graph_relation",
+          "source_evidence_count": "3"
+        }
+      },
+      {
+        "evidence_id": "V2+G3",
+        "evidence_type": "hybrid",
+        "rank": 2,
+        "score": 0.88,
+        "fusion_score": 0.886,
+        "document_id": "sample",
+        "chunk_id": "sample_chunk_0000",
+        "source": "sample.txt",
+        "content": "GraphRAG reduces information fragmentation by combining textual evidence with structured relational paths.",
+        "metadata": {
+          "evidence_ids": "V2,G3",
+          "evidence_types": "vector_chunk,graph_relation",
+          "source_evidence_count": "2"
+        }
+      }
+    ]
+  },
+  "qa": {
+    "question": "What is GraphRAG?",
+    "answer": "GraphRAG is a retrieval-augmented generation approach that combines vector search over document chunks with graph traversal over structured entity relationships. In this project, the two evidence streams are fused and reranked before the LLM generates an answer, which helps preserve multi-entity context and makes the supporting evidence traceable.",
+    "sources": [
+      {
+        "chunk_id": "sample_chunk_0001",
+        "document_id": "sample",
+        "source": "sample.txt",
+        "file_name": "sample.txt",
+        "score": 0.93,
+        "content": "GraphRAG combines vector search and graph traversal."
+      }
+    ],
+    "graph_sources": [],
+    "citations": [
+      {
+        "evidence_id": "V1+G1+G2",
+        "evidence_type": "hybrid",
+        "document_id": "sample",
+        "chunk_id": "sample_chunk_0001",
+        "source": "sample.txt",
+        "fusion_score": 0.965
+      },
+      {
+        "evidence_id": "V2+G3",
+        "evidence_type": "hybrid",
+        "document_id": "sample",
+        "chunk_id": "sample_chunk_0000",
+        "source": "sample.txt",
+        "fusion_score": 0.886
+      }
+    ],
+    "timings": {
+      "vector_ms": 68.1,
+      "graph_ms": 42.5,
+      "fusion_ms": 0.3,
+      "rerank_ms": 14.2,
+      "llm_ms": 856.7,
+      "total_ms": 983.4
+    }
+  }
+}

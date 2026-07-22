@@ -22,6 +22,7 @@
 
 - Python
 - FastAPI
+- Streamlit / Graphviz
 - LangChain
 - Neo4j
 - Milvus
@@ -108,8 +109,17 @@ http://localhost:8000/health
 }
 ```
 
+### 启动演示工作台
+
+```powershell
+python -m streamlit run demo/app.py --server.address 127.0.0.1 --server.port 8501
+```
+
+访问 `http://127.0.0.1:8501`。FastAPI 未启动时，页面会明确显示服务不可用，并使用仓库内的样例快照展示完整交互结构；实时演示流程见 [演示指南](docs/demo_guide.md)。
+
 ## 当前已实现能力
 
+- Streamlit GraphRAG 演示工作台，支持服务状态、预设问题、方法对比、引用追溯、阶段耗时和局部图谱视图
 - FastAPI 服务启动
 - FastAPI lifespan 运行时资源复用，避免每次请求重复加载 Embedding、Reranker 和数据库客户端
 - `/health` 健康检查接口

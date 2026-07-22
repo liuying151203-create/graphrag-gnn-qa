@@ -6,8 +6,12 @@
 
 ```text
 graphrag-gnn-qa/
+├── .streamlit/
+│   └── config.toml
 ├── AGENTS.md
 ├── data/
+│   ├── demo/
+│   │   └── sample_snapshot.json
 │   ├── eval/
 │   │   ├── questions.sample.jsonl
 │   │   ├── questions.dev.jsonl
@@ -22,6 +26,11 @@ graphrag-gnn-qa/
 │   │   └── .gitkeep
 │   └── tmp/
 │       └── .gitkeep
+├── demo/
+│   ├── __init__.py
+│   ├── api_client.py
+│   ├── app.py
+│   └── components.py
 ├── docs/
 │   ├── api.md
 │   ├── architecture.md
@@ -91,6 +100,8 @@ graphrag-gnn-qa/
 ├── tests/
 │   ├── test_build_hotpotqa_mini.py
 │   ├── test_config.py
+│   ├── test_demo_api_client.py
+│   ├── test_demo_components.py
 │   ├── test_document_loader.py
 │   ├── test_context_builder.py
 │   ├── test_debug_api.py
@@ -138,7 +149,7 @@ graphrag-gnn-qa/
 
 ### `requirements.txt`
 
-Python 依赖列表，用于安装 FastAPI、LangChain、Neo4j、Milvus、Embedding、测试等相关依赖。
+Python 依赖列表，用于安装 FastAPI、Streamlit、Graphviz、LangChain、Neo4j、Milvus、Embedding、测试等相关依赖。
 
 ### `pyproject.toml`
 
@@ -161,6 +172,21 @@ Git 忽略规则，用于避免提交虚拟环境、缓存、日志、模型文�
 ### `docker-compose.yml`
 
 用于启动 Neo4j、Milvus、etcd 和 MinIO 等外部基础服务。
+
+## `.streamlit/`
+
+Streamlit 演示工作台配置目录。`config.toml` 定义页面主题、字体和基础服务行为。
+
+## `demo/`
+
+面向面试和本地复盘的 GraphRAG 演示层：
+
+- `app.py`：Streamlit Research Workbench 页面入口。
+- `api_client.py`：封装 `/health`、`/ready`、`/retrieval/debug` 和 `/qa/ask` HTTP 调用。
+- `components.py`：预设问题、数据统计、方法对比、citation 映射和局部图谱 DOT 构造逻辑。
+- `__init__.py`：Demo Python 包标记。
+
+Demo 只通过 HTTP 访问 FastAPI，不直接持有 Milvus、Neo4j 或 LLM 客户端。
 
 ## `src/graphrag_gnn_qa/`
 
@@ -775,6 +801,10 @@ python scripts/evaluate_retrieval.py --vector-top-k 3 --graph-top-k 5 --graph-ma
 
 数据目录。
 
+### `data/demo/`
+
+存放可提交、脱敏的演示快照。`sample_snapshot.json` 用于在后端不可用时展示完整问答、证据对比、阶段耗时和局部图谱，并在界面中明确标记为非实时结果。
+
 ### `data/eval/`
 
 存放检索与问答评估问题集和评估结果。
@@ -835,6 +865,7 @@ graph_dataset.json
 当前测试覆盖：
 
 - FastAPI 健康检查接口
+- Demo API 客户端、预设问题、数据统计、方法对比和图谱 DOT 构造
 - 文档读取模块
 - 文本切分模块
 - 文档处理脚本

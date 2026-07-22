@@ -155,32 +155,32 @@ Demo MVP 暂不在这里暴露所有 `.env` 参数，避免界面变成配置后
 
 1. 用 30 秒介绍传统 RAG 的信息碎片问题和项目目标。
 2. 展示系统状态和已入库领域论文，不现场重建完整索引。
-3. 选择一个预设问题，先运行 Vector-only。
-4. 切换 GraphRAG hybrid，对比新增图谱证据和最终上下文。
+3. 选择一个预设问题并运行实时分析。
+4. 在对比表和证据 Tabs 中对比 Vector-only 与 GraphRAG hybrid。
 5. 点击 citation，展示答案如何追溯到 PDF chunk 或图谱关系。
 6. 打开 Graph View，解释实体 Schema 和邻域检索。
-7. 切换 keyword/BGE reranker，展示证据排序变化。
+7. 查看后端 Reranker 状态和 rerank 耗时，说明 keyword/BGE 由后端配置决定。
 8. 最后展示领域 mini set 的 baseline 表格，并主动说明指标局限。
 
 现场演示重点是解释设计决策和证据链，不建议现场执行 PDF 全量 embedding 或 LLM 图谱抽取，这些步骤耗时长且受网络影响。
 
 ### 3.6 Demo 数据与启动策略
 
-Demo 使用固定、可复现的数据快照：
+Demo 当前同时支持实时数据和固定快照：
 
-- 选择 2 到 6 篇领域 PDF。
-- 固定 chunk 参数、Embedding 模型、fusion 权重和 TopK。
-- 提前写入 Milvus 和 Neo4j。
-- 保存问题清单和评估摘要。
-- 启动后预热 Embedding 和 BGE Reranker。
+- 仓库提交 `sample.txt` 和 `data/demo/sample_snapshot.json`，用于无后端环境下展示完整界面。
+- 领域 PDF、生成索引和评估输出保留为本地数据，不假设每个克隆环境都已具备。
+- 实时演示前固定 chunk 参数、Embedding 模型、fusion 权重和 TopK，并提前写入 Milvus 与 Neo4j。
+- Streamlit 只通过 HTTP 调用 FastAPI，不直接读取数据库或加载在线模型。
 
-建议提供统一启动命令：
+当前分别启动 FastAPI 和 Streamlit：
 
 ```powershell
-python scripts/start_demo.py
+python -m uvicorn graphrag_gnn_qa.main:app --app-dir src --host 127.0.0.1 --port 8000
+python -m streamlit run demo/app.py --server.address 127.0.0.1 --server.port 8501
 ```
 
-该脚本后续负责：
+后续可以补充统一启动脚本，负责：
 
 - 检查 Docker 服务。
 - 检查 `.env` 和必要配置。
@@ -188,17 +188,15 @@ python scripts/start_demo.py
 - 等待 `/health` 成功。
 - 启动 Streamlit Demo。
 
-如暂不实现启动脚本，至少在文档中提供两条明确命令分别启动后端和 Demo。
-
 ### 3.7 失败降级
 
 Demo 必须考虑面试现场网络不稳定：
 
-- Milvus 或 Neo4j 不可用：启动前阻断并提示，不进入半可用状态。
-- LLM API 不可用：允许展示 retrieval/debug 和已保存的答案快照。
-- BGE Reranker 加载失败：显示 fallback 状态并切换 keyword reranker。
-- 图谱为空：隐藏 Graph View 并明确提示需要构建图谱。
-- 请求超时：保留上一次成功结果，提供重试操作。
+- API、Milvus 或 Neo4j 不可用：展示组件状态，并保留明确标记的样例快照。
+- LLM API 不可用：保留检索结果和已保存答案，不伪造实时问答。
+- BGE Reranker 加载失败：展示后端 readiness 返回的 fallback 状态。
+- 图谱为空：Graph View 明确提示当前问题没有命中关系。
+- 请求超时：保留上一次成功结果，并展示脱敏错误信息。
 
 可为预设问题保存经过脱敏的 Demo snapshot，但界面必须明确区分“实时结果”和“已保存结果”。
 
@@ -220,11 +218,11 @@ Demo 必须考虑面试现场网络不稳定：
 
 优先级：最高。
 
-当前状态：进行中。
+当前状态：MVP 代码已完成，领域数据现场联调待执行。
 
 - [x] Phase 1A：使用 FastAPI lifespan 初始化应用级资源，复用 Embedding、Reranker、Milvus、Neo4j 和 QA 服务，并在关闭应用时释放数据库连接。
 - [x] Phase 1B：增加服务就绪状态和 vector、graph、fusion、rerank、LLM 分阶段耗时。
-- [ ] Phase 1C：实现 Streamlit Demo MVP、方法对比和局部图谱视图。
+- [x] Phase 1C：实现 Streamlit Demo MVP、方法对比、离线快照和局部图谱视图。
 
 目标：形成面试官可直接体验的界面，同时解决重复模型加载带来的延迟。
 

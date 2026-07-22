@@ -4,7 +4,7 @@
 
 本系统旨在构建一个面向科研论文和技术文档的复杂关联知识问答系统，通过 GraphRAG 将向量检索与知识图谱检索结合起来，缓解传统 RAG 在复杂实体关系、多跳关联和证据可解释性方面的不足。
 
-当前阶段定位为 GraphRAG MVP：已经完成文档处理、向量检索、图谱构建、混合证据融合、问答生成、引用返回、轻量自动指标和评估记录链路，并已接入可配置 Rerank 和 Neo4j 图结构导出。Rerank 当前默认使用轻量关键词 overlap，也可通过配置切换到 BGE Reranker；GNN 节点特征构造、GAT 训练和更完整的对比实验作为后续增强模块逐步接入。
+当前阶段定位为 GraphRAG MVP：已经完成文档处理、向量检索、图谱构建、混合证据融合、问答生成、引用返回、轻量自动指标和评估记录链路，并已接入可配置 Rerank、Neo4j 图结构导出和 Streamlit 演示工作台。Rerank 当前默认使用轻量关键词 overlap，也可通过配置切换到 BGE Reranker；GNN 节点特征构造、GAT 训练和更完整的对比实验作为后续增强模块逐步接入。
 
 ## 总体架构
 
@@ -24,7 +24,9 @@
 
 在线问答：
 
-用户问题
+Streamlit Demo 或其他 HTTP 客户端
+  -> FastAPI /ready、/retrieval/debug、/qa/ask
+  -> 用户问题
   -> 查询理解与候选实体抽取
   -> Milvus 向量检索
   -> Neo4j 图谱邻域检索
@@ -46,6 +48,19 @@ Neo4j 知识图谱
 ```
 
 ## 核心模块
+
+### 演示层
+
+使用 Streamlit 提供面向面试和本地复盘的 GraphRAG Research Workbench。
+
+当前已实现：
+
+- 通过 HTTP 调用 FastAPI，不直接连接 Milvus、Neo4j 或 LLM
+- 展示 API、Embedding、Milvus、Neo4j、Reranker 和 LLM 就绪状态
+- 提供预设问题、自定义问题、Vector TopK、Graph TopK 和 Graph Depth 控件
+- 展示答案、citations、分阶段耗时以及 Vector-only 与 GraphRAG hybrid 对比
+- 使用证据 Tabs 和 Graphviz 局部图展示检索中间结果
+- 后端不可用时展示明确标记的样例快照；请求失败时保留上一份成功结果
 
 ### API 层
 
@@ -211,6 +226,7 @@ Neo4j 知识图谱
 - GraphRAG Context Builder 和 QA citations
 - 可配置 fusion 权重
 - 可配置 Rerank，用于 QA prompt 和 citations 前的二阶段证据排序
+- Streamlit 演示工作台、离线样例快照、检索方法对比和局部图谱视图
 - 评估记录脚本、轻量自动指标、聚合摘要和样例评估数据
 - Pytest 自动化测试覆盖核心模块
 
@@ -247,11 +263,12 @@ Neo4j 知识图谱
 
 ### Stage 2：评估指标与项目展示完善
 
-状态：建议优先推进。
+状态：部分完成。
 
 目标是让项目更适合简历展示和面试讲解：
 
-- 更新 README、架构文档和实验文档中的真实实现状态
+- 已实现 Streamlit 演示工作台、离线样例快照、证据对比和局部图谱视图
+- 已更新 README、架构文档和演示指南中的真实实现状态
 - 记录当前 dev set 的可复现实测结果
 - 继续扩充小规模评估问题，并引入更贴近真实论文或技术文档的样例
 - 输出 Vector-only、GraphRAG 等可对比的实验结果表格
