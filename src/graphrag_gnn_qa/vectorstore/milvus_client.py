@@ -65,6 +65,10 @@ def prepare_insert_columns(records: list[EmbeddingRecord]) -> list[list[Any]]:
     ]
 
 
+def build_document_filter(document_id: str) -> str:
+    return f"document_id == {json.dumps(document_id, ensure_ascii=True)}"
+
+
 class MilvusVectorStore:
     def __init__(
         self,
@@ -149,11 +153,24 @@ class MilvusVectorStore:
         collection = Collection(name=self.collection_name, using=self.alias)
         collection.load()
         records = collection.query(
-            expr=f'document_id == "{document_id}"',
+            expr=build_document_filter(document_id),
             output_fields=["chunk_id"],
             limit=1,
         )
         return bool(records)
+
+    def delete_document(self, document_id: str) -> int:
+        from pymilvus import Collection, utility
+
+        if not utility.has_collection(self.collection_name, using=self.alias):
+            return 0
+        collection = Collection(name=self.collection_name, using=self.alias)
+        mutation_result = collection.delete(expr=build_document_filter(document_id))
+        collection.flush()
+        delete_count = getattr(mutation_result, "delete_count", None)
+        if delete_count is not None:
+            return int(delete_count)
+        return len(getattr(mutation_result, "primary_keys", []))
 
     def search(self, query_embedding: list[float], top_k: int = 5) -> list[dict[str, Any]]:
         from pymilvus import Collection

@@ -5,7 +5,10 @@ from typing import Literal
 from graphrag_gnn_qa.config import Settings
 from graphrag_gnn_qa.graph.extractor import GraphExtractor
 from graphrag_gnn_qa.graph.neo4j_store import Neo4jGraphStore
-from graphrag_gnn_qa.ingestion.service import DocumentIngestionService
+from graphrag_gnn_qa.ingestion.service import (
+    DocumentIngestionService,
+    DocumentLifecycleService,
+)
 from graphrag_gnn_qa.llm.client import LLMClient, OpenAICompatibleLLMClient
 from graphrag_gnn_qa.rag.qa_service import RAGQAService
 from graphrag_gnn_qa.rerank import (
@@ -33,6 +36,7 @@ class RuntimeResources:
     reranker: EvidenceReranker
     qa_service: RAGQAService | None
     ingestion_service: DocumentIngestionService | None
+    document_lifecycle_service: DocumentLifecycleService
 
     def close(self) -> None:
         try:
@@ -108,6 +112,10 @@ def build_runtime_resources(settings: Settings) -> RuntimeResources:
         vector_retriever = VectorRetriever(embedding_model=embedding_model, vector_store=vector_store)
         graph_retriever = GraphRetriever(graph_store=graph_store)
         reranker = build_evidence_reranker(settings)
+        document_lifecycle_service = DocumentLifecycleService(
+            vector_store=vector_store,
+            graph_store=graph_store,
+        )
         llm_client = _build_llm_client(settings)
         qa_service = _build_qa_service(
             settings=settings,
@@ -122,6 +130,7 @@ def build_runtime_resources(settings: Settings) -> RuntimeResources:
             vector_store=vector_store,
             graph_store=graph_store,
             llm_client=llm_client,
+            lifecycle_service=document_lifecycle_service,
         )
         return RuntimeResources(
             settings=settings,
@@ -132,6 +141,7 @@ def build_runtime_resources(settings: Settings) -> RuntimeResources:
             reranker=reranker,
             qa_service=qa_service,
             ingestion_service=ingestion_service,
+            document_lifecycle_service=document_lifecycle_service,
         )
     except Exception:
         try:
@@ -181,6 +191,7 @@ def _build_ingestion_service(
     vector_store: MilvusVectorStore,
     graph_store: Neo4jGraphStore,
     llm_client: LLMClient | None,
+    lifecycle_service: DocumentLifecycleService,
 ) -> DocumentIngestionService | None:
     if llm_client is None:
         return None
@@ -192,6 +203,7 @@ def _build_ingestion_service(
         chunk_size=settings.ingestion_chunk_size,
         chunk_overlap=settings.ingestion_chunk_overlap,
         embedding_batch_size=settings.ingestion_embedding_batch_size,
+        lifecycle_service=lifecycle_service,
     )
 
 

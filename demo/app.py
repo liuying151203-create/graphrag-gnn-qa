@@ -118,6 +118,117 @@ def run_analysis(
     }
 
 
+def upload_document(
+    base_url: str,
+    filename: str,
+    content: bytes,
+    content_type: str,
+    overwrite: bool,
+) -> dict[str, Any]:
+    client = GraphRAGApiClient(base_url=base_url, timeout=300)
+    try:
+        return client.upload_document(
+            filename=filename,
+            content=content,
+            content_type=content_type,
+            overwrite=overwrite,
+        ).data
+    finally:
+        client.close()
+
+
+def delete_document(base_url: str, document_id: str) -> dict[str, Any]:
+    client = GraphRAGApiClient(base_url=base_url, timeout=60)
+    try:
+        return client.delete_document(document_id).data
+    finally:
+        client.close()
+
+
+def render_document_management(base_url: str) -> None:
+    with st.expander("文档管理", expanded=False):
+        deleted_result = st.session_state.get("document_deletion_result")
+        if deleted_result:
+            st.success(f"已删除 {deleted_result.get('document_id', 'unknown')}")
+            deleted_columns = st.columns(3)
+            deleted_columns[0].metric("Chunks", deleted_result.get("deleted_chunk_count", 0))
+            deleted_columns[1].metric("关系", deleted_result.get("deleted_relation_count", 0))
+            deleted_columns[2].metric("实体", deleted_result.get("deleted_entity_count", 0))
+
+        uploaded_file = st.file_uploader(
+            "选择文档",
+            type=["txt", "md", "markdown", "pdf"],
+            key="document_upload_file",
+        )
+        overwrite = st.checkbox(
+            "覆盖相同内容的已有索引",
+            key="document_overwrite",
+            disabled=uploaded_file is None,
+        )
+        upload_requested = st.button(
+            "上传并入库",
+            type="primary",
+            icon=":material/upload_file:",
+            width="stretch",
+            disabled=uploaded_file is None,
+        )
+        if upload_requested and uploaded_file is not None:
+            with st.spinner("正在解析、抽取并写入双库..."):
+                try:
+                    result = upload_document(
+                        base_url=base_url,
+                        filename=uploaded_file.name,
+                        content=uploaded_file.getvalue(),
+                        content_type=uploaded_file.type or "application/octet-stream",
+                        overwrite=overwrite,
+                    )
+                except DemoApiError as exc:
+                    st.error(str(exc))
+                else:
+                    st.session_state["document_upload_result"] = result
+                    st.session_state.pop("document_deletion_result", None)
+                    fetch_readiness.clear()
+
+        upload_result = st.session_state.get("document_upload_result")
+        if not upload_result:
+            return
+
+        operation_label = "覆盖重建" if upload_result.get("operation") == "replaced" else "新建索引"
+        st.success(f"{operation_label}完成：{upload_result.get('filename', 'unknown')}")
+        st.caption(str(upload_result.get("document_id") or ""))
+        result_columns = st.columns(4)
+        result_columns[0].metric("Chunks", upload_result.get("chunk_count", 0))
+        result_columns[1].metric("实体", upload_result.get("entity_count", 0))
+        result_columns[2].metric("关系", upload_result.get("relation_count", 0))
+        result_columns[3].metric(
+            "总耗时",
+            f"{float((upload_result.get('timings') or {}).get('total_ms', 0.0)):.1f} ms",
+        )
+
+        document_id = str(upload_result.get("document_id") or "")
+        confirm_delete = st.checkbox(
+            "确认删除此文档",
+            key=f"confirm_delete_{document_id}",
+            disabled=not document_id,
+        )
+        if st.button(
+            "删除文档",
+            icon=":material/delete:",
+            width="stretch",
+            disabled=not document_id or not confirm_delete,
+        ):
+            with st.spinner("正在清理向量和图谱证据..."):
+                try:
+                    deletion_result = delete_document(base_url, document_id)
+                except DemoApiError as exc:
+                    st.error(str(exc))
+                else:
+                    st.session_state["document_deletion_result"] = deletion_result
+                    st.session_state.pop("document_upload_result", None)
+                    fetch_readiness.clear()
+                    st.rerun()
+
+
 def render_service_status(readiness: dict[str, Any] | None, error: str | None) -> None:
     components = (readiness or {}).get("components") or {}
     if not components:
@@ -453,6 +564,8 @@ dataset_columns[1].metric("文档", dataset_stats.document_count)
 dataset_columns[2].metric("Chunks", dataset_stats.chunk_count)
 dataset_columns[3].metric("实体", dataset_stats.entity_count)
 dataset_columns[4].metric("关系", dataset_stats.relation_count)
+
+render_document_management(api_base_url)
 
 if run_requested:
     with st.spinner("正在执行混合检索与问答..."):

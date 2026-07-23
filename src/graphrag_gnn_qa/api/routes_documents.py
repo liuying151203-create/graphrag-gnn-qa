@@ -3,14 +3,18 @@ from __future__ import annotations
 from typing import Literal, Protocol
 
 import httpx
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
 from graphrag_gnn_qa.api.dependencies import get_runtime_resources
 from graphrag_gnn_qa.config import Settings, get_settings
 from graphrag_gnn_qa.ingestion.service import (
+    DocumentDeletionResult,
+    DocumentDeletionStageError,
+    DocumentIdValidationError,
     DocumentIngestionResult,
+    DocumentNotFoundError,
     DocumentValidationError,
     DuplicateDocumentError,
     IngestionStageError,
@@ -24,6 +28,7 @@ class IngestionTimingsResponse(BaseModel):
     chunk_ms: float
     embedding_ms: float
     graph_extraction_ms: float
+    cleanup_ms: float
     vector_write_ms: float
     graph_write_ms: float
     total_ms: float
@@ -31,6 +36,7 @@ class IngestionTimingsResponse(BaseModel):
 
 class DocumentUploadResponse(BaseModel):
     status: Literal["completed"]
+    operation: Literal["created", "replaced"]
     document_id: str
     content_sha256: str
     filename: str
@@ -39,12 +45,44 @@ class DocumentUploadResponse(BaseModel):
     embedding_count: int
     entity_count: int
     relation_count: int
+    deleted_chunk_count: int
+    deleted_relation_count: int
+    deleted_entity_count: int
     timings: IngestionTimingsResponse
 
 
 class IngestionService(Protocol):
-    def ingest(self, filename: str, content: bytes) -> DocumentIngestionResult:
+    def ingest(
+        self,
+        filename: str,
+        content: bytes,
+        overwrite: bool = False,
+    ) -> DocumentIngestionResult:
         ...
+
+
+class DocumentLifecycle(Protocol):
+    def delete(
+        self,
+        document_id: str,
+        require_exists: bool = True,
+    ) -> DocumentDeletionResult:
+        ...
+
+
+class DeletionTimingsResponse(BaseModel):
+    graph_delete_ms: float
+    vector_delete_ms: float
+    total_ms: float
+
+
+class DocumentDeleteResponse(BaseModel):
+    status: Literal["completed"]
+    document_id: str
+    deleted_chunk_count: int
+    deleted_relation_count: int
+    deleted_entity_count: int
+    timings: DeletionTimingsResponse
 
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -62,6 +100,18 @@ def get_document_ingestion_service(
     return ingestion_service
 
 
+def get_document_lifecycle_service(
+    resources: RuntimeResources = Depends(get_runtime_resources),
+) -> DocumentLifecycle:
+    lifecycle_service = getattr(resources, "document_lifecycle_service", None)
+    if lifecycle_service is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Document lifecycle service is not initialized",
+        )
+    return lifecycle_service
+
+
 @router.post(
     "/upload",
     response_model=DocumentUploadResponse,
@@ -77,6 +127,7 @@ def get_document_ingestion_service(
 )
 async def upload_document(
     file: UploadFile = File(...),
+    overwrite: bool = Form(default=False),
     settings: Settings = Depends(get_settings),
     ingestion_service: IngestionService = Depends(get_document_ingestion_service),
 ) -> DocumentUploadResponse:
@@ -100,6 +151,7 @@ async def upload_document(
             ingestion_service.ingest,
             filename,
             content,
+            overwrite,
         )
     except UnsupportedDocumentTypeError as exc:
         raise HTTPException(
@@ -129,11 +181,15 @@ async def upload_document(
                 "stage": exc.stage,
                 "document_id": exc.document_id,
                 "message": str(exc),
+                "deleted_chunk_count": exc.deleted_chunk_count,
+                "deleted_relation_count": exc.deleted_relation_count,
+                "deleted_entity_count": exc.deleted_entity_count,
             },
         ) from exc
 
     return DocumentUploadResponse(
         status=result.status,
+        operation=result.operation,
         document_id=result.document_id,
         content_sha256=result.content_sha256,
         filename=result.filename,
@@ -142,13 +198,75 @@ async def upload_document(
         embedding_count=result.embedding_count,
         entity_count=result.entity_count,
         relation_count=result.relation_count,
+        deleted_chunk_count=result.deleted_chunk_count,
+        deleted_relation_count=result.deleted_relation_count,
+        deleted_entity_count=result.deleted_entity_count,
         timings=IngestionTimingsResponse(**result.timings.__dict__),
+    )
+
+
+@router.delete(
+    "/{document_id}",
+    response_model=DocumentDeleteResponse,
+    responses={
+        status.HTTP_404_NOT_FOUND: {"description": "Document does not exist"},
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {"description": "Invalid document ID"},
+        status.HTTP_503_SERVICE_UNAVAILABLE: {"description": "Deletion dependency is unavailable"},
+    },
+)
+async def delete_document(
+    document_id: str,
+    lifecycle_service: DocumentLifecycle = Depends(get_document_lifecycle_service),
+) -> DocumentDeleteResponse:
+    try:
+        result = await run_in_threadpool(
+            lifecycle_service.delete,
+            document_id,
+            True,
+        )
+    except DocumentIdValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "invalid_document_id", "message": str(exc)},
+        ) from exc
+    except DocumentNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "document_not_found", "document_id": exc.document_id},
+        ) from exc
+    except DocumentDeletionStageError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "document_deletion_failed",
+                "status": exc.status,
+                "stage": exc.stage,
+                "document_id": exc.document_id,
+                "message": str(exc),
+                "deleted_chunk_count": exc.deleted_chunk_count,
+                "deleted_relation_count": exc.deleted_relation_count,
+                "deleted_entity_count": exc.deleted_entity_count,
+            },
+        ) from exc
+    return DocumentDeleteResponse(
+        status=result.status,
+        document_id=result.document_id,
+        deleted_chunk_count=result.deleted_chunk_count,
+        deleted_relation_count=result.deleted_relation_count,
+        deleted_entity_count=result.deleted_entity_count,
+        timings=DeletionTimingsResponse(**result.timings.__dict__),
     )
 
 
 def _stage_error_status(error: IngestionStageError) -> int:
     if isinstance(error.cause, httpx.HTTPError):
         return status.HTTP_502_BAD_GATEWAY
-    if error.stage in {"duplicate_check", "vector_write", "graph_write"}:
+    if error.stage in {
+        "duplicate_check",
+        "graph_delete",
+        "vector_delete",
+        "vector_write",
+        "graph_write",
+    }:
         return status.HTTP_503_SERVICE_UNAVAILABLE
     return status.HTTP_500_INTERNAL_SERVER_ERROR

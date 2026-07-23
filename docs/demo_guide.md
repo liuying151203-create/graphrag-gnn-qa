@@ -71,6 +71,16 @@ http://127.0.0.1:8501
 - Chunks：`data/processed/chunks.jsonl` 记录数。
 - 实体与关系：`data/processed/graph_triples.jsonl` 中去重实体数和关系数。
 
+### 文档管理
+
+`文档管理` 折叠区提供端到端入库和删除操作：
+
+- 上传 TXT、Markdown 或 PDF，并展示文档 ID、chunk、实体、关系和总耗时。
+- 勾选覆盖选项后，重建相同内容对应的索引；内容变化会生成新的文档 ID。
+- 输入文档 ID 并显式确认后，删除 Milvus chunks、Neo4j 文档关系和可安全清理的孤立实体。
+
+上传依赖 Embedding、LLM、Milvus 和 Neo4j 全部就绪，删除不依赖 LLM。页面顶部的数据规模来自本地预处理文件，不会随着 API 数据库操作即时变化；上传或删除结果以操作区返回的统计为准。
+
 ### 查询配置
 
 侧边栏提供：
@@ -131,7 +141,8 @@ python scripts/load_graph_to_neo4j.py
 5. 打开 citation，追溯到文档 chunk。
 6. 在 Graph Results 和 Graph View 中解释实体关系与邻域检索。
 7. 用耗时图说明检索、重排和 LLM 的性能瓶颈。
-8. 最后说明快照降级、当前评估边界、已实现的同步上传 API 和后续文档生命周期计划。
+8. 展开文档管理区，展示上传、覆盖重建和确认删除能力；现场可使用小型 TXT 演示，避免全量 PDF 处理。
+9. 最后说明快照降级、当前评估边界，以及后续后台任务和进度查询计划。
 
 面试现场不建议执行全量 PDF embedding 或 LLM 图谱抽取，这些步骤耗时较长并依赖外部服务。
 

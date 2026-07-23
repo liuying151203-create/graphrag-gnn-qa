@@ -1,10 +1,17 @@
 import re
+from dataclasses import dataclass
 from typing import Any
 
 from neo4j import GraphDatabase
 
 from graphrag_gnn_qa.graph.extractor import ALLOWED_ENTITY_TYPES, ALLOWED_RELATION_TYPES
 from graphrag_gnn_qa.gnn.graph_dataset import GraphDataset, graph_dataset_from_records
+
+
+@dataclass(frozen=True)
+class GraphDocumentDeletion:
+    deleted_relation_count: int
+    deleted_entity_count: int
 
 
 class Neo4jGraphStore:
@@ -31,6 +38,7 @@ class Neo4jGraphStore:
                     id=build_entity_id(entity["type"], entity["name"]),
                     name=entity["name"],
                     description=entity.get("description", ""),
+                    document_id=record["document_id"],
                 )
 
             for relation in record.get("relations", []):
@@ -57,6 +65,10 @@ class Neo4jGraphStore:
         for record in records:
             self.upsert_graph_record(record)
         return len(records)
+
+    def delete_document(self, document_id: str) -> GraphDocumentDeletion:
+        with self.driver.session(database=self.database) as session:
+            return session.execute_write(_delete_document_transaction, document_id)
 
     def search_neighbors(self, query: str, top_k: int = 5, max_depth: int = 1) -> list[dict[str, Any]]:
         query_text = query.strip().lower()
@@ -86,7 +98,14 @@ def build_entity_id(entity_type: str, name: str) -> str:
 
 def build_entity_merge_query(entity_type: str) -> str:
     validate_entity_type(entity_type)
-    return f"MERGE (n:{entity_type} {{id: $id}}) SET n.name = $name, n.description = $description"
+    return (
+        f"MERGE (n:{entity_type} {{id: $id}}) "
+        "SET n.name = $name, "
+        "n.description = $description, "
+        "n.document_ids = CASE "
+        "WHEN $document_id IN coalesce(n.document_ids, []) THEN coalesce(n.document_ids, []) "
+        "ELSE coalesce(n.document_ids, []) + [$document_id] END"
+    )
 
 
 def build_relation_merge_query(source_type: str, relation_type: str, target_type: str) -> str:
@@ -95,14 +114,60 @@ def build_relation_merge_query(source_type: str, relation_type: str, target_type
     validate_relation_type(relation_type)
     return (
         f"MERGE (source:{source_type} {{id: $source_id}}) "
-        "SET source.name = $source_name "
+        "SET source.name = $source_name, "
+        "source.document_ids = CASE "
+        "WHEN $document_id IN coalesce(source.document_ids, []) THEN coalesce(source.document_ids, []) "
+        "ELSE coalesce(source.document_ids, []) + [$document_id] END "
         f"MERGE (target:{target_type} {{id: $target_id}}) "
-        "SET target.name = $target_name "
-        f"MERGE (source)-[rel:{relation_type} {{chunk_id: $chunk_id}}]->(target) "
-        "SET rel.document_id = $document_id, "
-        "rel.source = $source, "
+        "SET target.name = $target_name, "
+        "target.document_ids = CASE "
+        "WHEN $document_id IN coalesce(target.document_ids, []) THEN coalesce(target.document_ids, []) "
+        "ELSE coalesce(target.document_ids, []) + [$document_id] END "
+        f"MERGE (source)-[rel:{relation_type} "
+        "{document_id: $document_id, chunk_id: $chunk_id}]->(target) "
+        "SET rel.source = $source, "
         "rel.evidence = $evidence, "
         "rel.confidence = $confidence"
+    )
+
+
+def build_delete_document_relations_query() -> str:
+    return (
+        "MATCH ()-[relationship]->() "
+        "WHERE relationship.document_id = $document_id "
+        "WITH collect(relationship) AS relationships "
+        "WITH relationships, size(relationships) AS deleted_relation_count "
+        "FOREACH (relationship IN relationships | DELETE relationship) "
+        "RETURN deleted_relation_count"
+    )
+
+
+def build_cleanup_document_entities_query() -> str:
+    return (
+        "MATCH (node) "
+        "WHERE $document_id IN coalesce(node.document_ids, []) "
+        "SET node.document_ids = [item IN coalesce(node.document_ids, []) WHERE item <> $document_id] "
+        "WITH node "
+        "WHERE size(node.document_ids) = 0 AND NOT EXISTS { MATCH (node)--() } "
+        "WITH collect(node) AS nodes "
+        "WITH nodes, size(nodes) AS deleted_entity_count "
+        "FOREACH (node IN nodes | DELETE node) "
+        "RETURN deleted_entity_count"
+    )
+
+
+def _delete_document_transaction(transaction: Any, document_id: str) -> GraphDocumentDeletion:
+    relation_record = transaction.run(
+        build_delete_document_relations_query(),
+        document_id=document_id,
+    ).single()
+    entity_record = transaction.run(
+        build_cleanup_document_entities_query(),
+        document_id=document_id,
+    ).single()
+    return GraphDocumentDeletion(
+        deleted_relation_count=int((relation_record or {}).get("deleted_relation_count", 0)),
+        deleted_entity_count=int((entity_record or {}).get("deleted_entity_count", 0)),
     )
 
 

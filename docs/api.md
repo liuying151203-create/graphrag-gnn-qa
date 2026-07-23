@@ -59,6 +59,7 @@ multipart/form-data
 字段：
 
 - `file`：必填，支持 TXT、Markdown 和 PDF。
+- `overwrite`：可选，默认为 `false`；设为 `true` 时重新构建相同内容对应的索引。
 - 默认大小上限为 20 MiB，可通过 `DOCUMENT_UPLOAD_MAX_BYTES` 调整。
 - 当前完整入库依赖 LLM 图谱抽取，因此未配置 `LLM_API_KEY` 时返回 HTTP 503。
 
@@ -68,12 +69,19 @@ multipart/form-data
 curl.exe -X POST http://127.0.0.1:8000/documents/upload -F "file=@data/raw/sample.txt"
 ```
 
+覆盖重建相同内容：
+
+```powershell
+curl.exe -X POST http://127.0.0.1:8000/documents/upload -F "overwrite=true" -F "file=@data/raw/sample.txt"
+```
+
 处理语义：
 
 - 使用文件内容 SHA-256 生成稳定的 `document_id`，同一内容即使文件名不同也具有相同 ID。
 - 在数据库写入前完成解析、切分、Embedding 和图谱抽取，减少外部模型失败造成的半入库。
 - Neo4j 使用实体和关系 MERGE，Milvus 使用稳定 chunk 主键 upsert。
 - 已存在相同内容时返回 HTTP 409，不重复生成 chunk 或关系。
+- `overwrite=true` 时先完成新 Embedding 和图谱抽取，再删除同一 `document_id` 的旧证据并写入新索引。
 - 成功后立即可以通过现有检索和问答接口查询。
 
 成功响应为 HTTP 201：
@@ -81,6 +89,7 @@ curl.exe -X POST http://127.0.0.1:8000/documents/upload -F "file=@data/raw/sampl
 ```json
 {
   "status": "completed",
+  "operation": "created",
   "document_id": "doc_6d00a60f9e5194d777ba7b4a8c585768",
   "content_sha256": "6d00a60f9e5194d777ba7b4a8c585768d8b28bdb8f4a91f662d1a67f22d7b432",
   "filename": "sample.txt",
@@ -89,11 +98,15 @@ curl.exe -X POST http://127.0.0.1:8000/documents/upload -F "file=@data/raw/sampl
   "embedding_count": 5,
   "entity_count": 18,
   "relation_count": 16,
+  "deleted_chunk_count": 0,
+  "deleted_relation_count": 0,
+  "deleted_entity_count": 0,
   "timings": {
     "parse_ms": 0.121,
     "chunk_ms": 0.084,
     "embedding_ms": 164.532,
     "graph_extraction_ms": 3821.774,
+    "cleanup_ms": 0.0,
     "vector_write_ms": 92.614,
     "graph_write_ms": 104.527,
     "total_ms": 4184.102
@@ -119,7 +132,10 @@ curl.exe -X POST http://127.0.0.1:8000/documents/upload -F "file=@data/raw/sampl
     "status": "partial_failed",
     "stage": "graph_write",
     "document_id": "doc_6d00a60f9e5194d777ba7b4a8c585768",
-    "message": "Document ingestion failed during graph_write"
+    "message": "Document ingestion failed during graph_write",
+    "deleted_chunk_count": 0,
+    "deleted_relation_count": 0,
+    "deleted_entity_count": 0
   }
 }
 ```
@@ -127,8 +143,42 @@ curl.exe -X POST http://127.0.0.1:8000/documents/upload -F "file=@data/raw/sampl
 当前限制：
 
 - 仅支持同步单文档上传，调用方需要等待全流程完成。
-- 尚未提供文档删除、强制覆盖、任务进度查询和后台队列。
+- 内容变化会生成新的 `document_id`；更新后的文件需要先删除旧 ID，再上传新内容。
+- 尚未提供任务进度查询和后台队列。
 - 数据库写入不具备跨 Milvus 与 Neo4j 的分布式事务；接口通过写入顺序、稳定主键和结构化 `partial_failed` 状态降低并暴露该风险。
+
+### `DELETE /documents/{document_id}`
+
+按文档 ID 删除 Milvus chunks、Neo4j 关系和可安全清理的孤立实体。删除不依赖 LLM 配置。
+
+```powershell
+curl.exe -X DELETE http://127.0.0.1:8000/documents/doc_6d00a60f9e5194d777ba7b4a8c585768
+```
+
+成功响应：
+
+```json
+{
+  "status": "completed",
+  "document_id": "doc_6d00a60f9e5194d777ba7b4a8c585768",
+  "deleted_chunk_count": 5,
+  "deleted_relation_count": 16,
+  "deleted_entity_count": 7,
+  "timings": {
+    "graph_delete_ms": 23.581,
+    "vector_delete_ms": 31.204,
+    "total_ms": 54.912
+  }
+}
+```
+
+删除语义：
+
+- Neo4j 实体使用 `document_ids` 记录文档归属。
+- 删除关系后，从实体的 `document_ids` 中移除当前文档。
+- 只有归属为空且没有剩余关系的实体才会删除，共享实体会保留。
+- 文档不存在时返回 HTTP 404；非法 ID 返回 HTTP 422。
+- 双库任一删除阶段失败时返回 HTTP 503，并通过 `failed` 或 `partial_failed` 及已完成删除数量说明当前状态。
 
 ## 问答接口
 

@@ -76,6 +76,27 @@ class GraphRAGApiClient:
             json={"question": question, "top_k": top_k},
         )
 
+    def upload_document(
+        self,
+        filename: str,
+        content: bytes,
+        content_type: str = "application/octet-stream",
+        overwrite: bool = False,
+    ) -> ApiResult:
+        return self._request(
+            "POST",
+            "/documents/upload",
+            accepted_statuses={201},
+            data={"overwrite": str(overwrite).lower()},
+            files={"file": (filename, content, content_type)},
+        )
+
+    def delete_document(self, document_id: str) -> ApiResult:
+        return self._request(
+            "DELETE",
+            f"/documents/{document_id}",
+        )
+
     def _request(
         self,
         method: str,

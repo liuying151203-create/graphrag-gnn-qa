@@ -125,11 +125,23 @@ FastAPI、Milvus、Neo4j 和 LLM 均就绪后，可同步上传 TXT、Markdown �
 curl.exe -X POST http://127.0.0.1:8000/documents/upload -F "file=@data/raw/sample.txt"
 ```
 
-接口使用内容 SHA-256 生成稳定 `document_id`，并完成切分、Embedding、图谱抽取和双库写入。默认文件上限为 20 MiB，重复内容返回 HTTP 409；详细契约见 [API 设计](docs/api.md)。
+接口使用内容 SHA-256 生成稳定 `document_id`，并完成切分、Embedding、图谱抽取和双库写入。默认文件上限为 20 MiB，重复内容返回 HTTP 409；需要重建相同内容的索引时显式传入 `overwrite=true`：
+
+```powershell
+curl.exe -X POST http://127.0.0.1:8000/documents/upload -F "overwrite=true" -F "file=@data/raw/sample.txt"
+```
+
+使用上传响应中的 `document_id` 可以删除对应的向量和图谱证据：
+
+```powershell
+curl.exe -X DELETE http://127.0.0.1:8000/documents/<document_id>
+```
+
+Streamlit 工作台也提供上传、覆盖重建和确认删除入口。内容变化后会生成新的 ID，需要删除旧 ID 再上传新文件；详细契约见 [API 设计](docs/api.md)。
 
 ## 当前已实现能力
 
-- Streamlit GraphRAG 演示工作台，支持服务状态、预设问题、方法对比、引用追溯、阶段耗时和局部图谱视图
+- Streamlit GraphRAG 演示工作台，支持服务状态、文档生命周期管理、预设问题、方法对比、引用追溯、阶段耗时和局部图谱视图
 - FastAPI 服务启动
 - FastAPI lifespan 运行时资源复用，避免每次请求重复加载 Embedding、Reranker 和数据库客户端
 - `/health` 健康检查接口
@@ -144,7 +156,8 @@ curl.exe -X POST http://127.0.0.1:8000/documents/upload -F "file=@data/raw/sampl
 - `POST /graph/retrieve` 图谱检索 API
 - `POST /retrieval/debug` 检索调试 API
 - `POST /qa/ask` GraphRAG-aware 问答 API
-- `POST /documents/upload` 同步文档入库 API，支持内容哈希、重复检测、Milvus upsert、Neo4j MERGE 和阶段耗时
+- `POST /documents/upload` 同步文档入库 API，支持内容哈希、重复检测、覆盖重建、Milvus upsert、Neo4j MERGE 和阶段耗时
+- `DELETE /documents/{document_id}` 文档删除 API，清理向量、文档关系和可安全删除的孤立实体
 - 检索和问答分阶段耗时，覆盖 vector、graph、fusion、rerank 和 LLM
 - GraphRAG Context Builder，用于统一组织向量上下文、图谱上下文、混合证据上下文和 LLM prompt
 - Hybrid Retrieval Result Model，用于统一表示、融合排序并去重向量证据和图谱证据

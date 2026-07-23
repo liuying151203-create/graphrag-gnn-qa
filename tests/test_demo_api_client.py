@@ -74,3 +74,40 @@ def test_demo_api_client_rejects_backend_error_response() -> None:
         client.ask(question="GraphRAG", top_k=3)
 
     client.close()
+
+
+def test_demo_api_client_uploads_and_deletes_document() -> None:
+    requests = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.method == "POST":
+            return httpx.Response(
+                201,
+                json={"status": "completed", "document_id": "doc_123"},
+            )
+        return httpx.Response(
+            200,
+            json={"status": "completed", "document_id": "doc_123"},
+        )
+
+    client = GraphRAGApiClient(transport=httpx.MockTransport(handler))
+
+    upload = client.upload_document(
+        filename="paper.txt",
+        content=b"GraphRAG content",
+        content_type="text/plain",
+        overwrite=True,
+    )
+    deletion = client.delete_document("doc_123")
+    client.close()
+
+    upload_body = requests[0].read()
+    assert upload.status_code == 201
+    assert b'name="overwrite"' in upload_body
+    assert b"true" in upload_body
+    assert b'filename="paper.txt"' in upload_body
+    assert b"GraphRAG content" in upload_body
+    assert requests[1].method == "DELETE"
+    assert requests[1].url.path == "/documents/doc_123"
+    assert deletion.status_code == 200

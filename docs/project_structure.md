@@ -186,7 +186,7 @@ Streamlit 演示工作台配置目录。`config.toml` 定义页面主题、字�
 面向面试和本地复盘的 GraphRAG 演示层：
 
 - `app.py`：Streamlit Research Workbench 页面入口。
-- `api_client.py`：封装 `/health`、`/ready`、`/retrieval/debug` 和 `/qa/ask` HTTP 调用。
+- `api_client.py`：封装健康检查、检索、问答、文档上传和文档删除 HTTP 调用。
 - `components.py`：预设问题、数据统计、方法对比、citation 映射和局部图谱 DOT 构造逻辑。
 - `__init__.py`：Demo Python 包标记。
 
@@ -210,11 +210,12 @@ POST /graph/retrieve
 POST /retrieval/debug
 POST /qa/ask
 POST /documents/upload
+DELETE /documents/{document_id}
 ```
 
 ### `runtime.py`
 
-应用级运行时资源模块，统一初始化和复用 Embedding、Milvus、Neo4j、VectorRetriever、GraphRetriever、Reranker、QA 和文档入库服务，负责组件就绪检查和数据库连接关闭。
+应用级运行时资源模块，统一初始化和复用 Embedding、Milvus、Neo4j、VectorRetriever、GraphRetriever、Reranker、QA、文档入库和文档生命周期服务，负责组件就绪检查和数据库连接关闭。
 
 ### `config.py`
 
@@ -231,7 +232,7 @@ API 路由目录。
 - `dependencies.py`：从 FastAPI `app.state` 获取应用级运行时资源
 - `routes_health.py`：健康检查接口
 - `routes_debug.py`：检索调试接口
-- `routes_documents.py`：同步文档上传和入库接口
+- `routes_documents.py`：同步文档上传、覆盖重建和删除接口
 - `routes_graph.py`：图谱检索接口
 - `routes_qa.py`：问答接口
 - `routes_retrieve.py`：向量检索接口
@@ -249,13 +250,14 @@ GET /ready
 
 #### `routes_documents.py`
 
-提供同步文档上传 API：
+提供同步文档上传和删除 API：
 
 ```text
 POST /documents/upload
+DELETE /documents/{document_id}
 ```
 
-负责 multipart 文件大小限制、依赖检查、线程池调用、响应模型转换，以及重复、文档校验和阶段失败的 HTTP 错误映射。
+负责 multipart 文件大小限制、覆盖选项、文档 ID 校验、依赖检查、线程池调用、响应模型转换，以及重复、不存在和阶段失败的 HTTP 错误映射。
 
 #### `routes_retrieve.py`
 
@@ -353,7 +355,10 @@ POST /qa/ask
 - 分批生成 Embedding
 - 调用 LLM 抽取实体关系
 - 使用 Neo4j MERGE 和 Milvus upsert 写入
+- 支持显式覆盖重建相同内容的索引
 - 返回数量统计、阶段耗时和结构化失败阶段
+
+`DocumentLifecycleService` 负责按 `document_id` 编排 Neo4j 与 Milvus 删除，返回双库删除数量、耗时和部分失败状态。
 
 ### `graph/`
 
@@ -379,11 +384,11 @@ POST /qa/ask
 
 #### `neo4j_store.py`
 
-负责将实体和关系写入 Neo4j。
+负责将实体和关系写入 Neo4j，并维护文档归属和按文档清理能力。
 
 当前包含：
 
-- `Neo4jGraphStore`：封装 Neo4j driver、约束创建、节点和关系写入、图结构导出
+- `Neo4jGraphStore`：封装 Neo4j driver、约束创建、节点和关系写入、按文档删除、孤立实体清理和图结构导出
 - `build_entity_id`：生成稳定实体 ID
 - `build_entity_merge_query`：构造节点 `MERGE` Cypher
 - `build_relation_merge_query`：构造关系 `MERGE` Cypher
@@ -485,7 +490,7 @@ RAG 问答编排模块目录。
 
 #### `milvus_client.py`
 
-负责读取文本块向量文件，并将向量写入 Milvus。
+负责读取文本块向量文件，将向量写入 Milvus，并按稳定文档 ID 检测或删除索引。
 
 当前包含：
 
@@ -493,7 +498,7 @@ RAG 问答编排模块目录。
 - `read_embedding_records`：读取 `chunk_embeddings.jsonl`
 - `infer_embedding_dimension`：推断向量维度
 - `prepare_insert_columns`：将记录转换为 Milvus 插入格式
-- `MilvusVectorStore`：封装 Milvus 连接、collection 创建、插入和搜索
+- `MilvusVectorStore`：封装 Milvus 连接、collection 创建、插入、upsert、文档检测、按文档删除和搜索
 
 ### `retrieval/`
 

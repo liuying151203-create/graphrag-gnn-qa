@@ -6,6 +6,13 @@
 
 ## 节点类型
 
+所有实体节点均包含以下通用属性：
+
+- `id`：由实体类型和规范化名称组成的唯一标识。
+- `name`：实体显示名称。
+- `description`：可选实体描述。
+- `document_ids`：提及该实体的文档 ID 列表，用于共享实体保留和按文档清理。
+
 ### `Paper`
 
 表示论文或技术文档。
@@ -158,8 +165,21 @@
 每条关系建议保留以下属性：
 
 - `source`
+- `document_id`
 - `chunk_id`
 - `evidence`
 - `confidence`
 
 这样可以在回答时返回证据来源，降低大模型幻觉风险。
+
+## 文档归属与清理
+
+实体按 `type + normalized name` 全局合并，因此同一实体可以被多篇文档共享。每次图谱写入会幂等追加实体的 `document_ids`；关系把 `document_id + chunk_id` 纳入 `MERGE` 身份，避免不同文档的同类证据相互覆盖。
+
+删除文档时按以下顺序处理：
+
+1. 删除 `relationship.document_id` 匹配的关系。
+2. 从相关实体的 `document_ids` 中移除当前文档。
+3. 仅删除 `document_ids` 为空且没有任何剩余关系的实体。
+
+旧数据如果尚无 `document_ids` 属性，不会被孤立实体清理逻辑直接删除；通过覆盖重建重新写入后会获得文档归属信息。

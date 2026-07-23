@@ -6,6 +6,7 @@ import pytest
 from graphrag_gnn_qa.vectorstore.milvus_client import (
     EmbeddingRecord,
     MilvusVectorStore,
+    build_document_filter,
     infer_embedding_dimension,
     prepare_insert_columns,
     read_embedding_records,
@@ -184,3 +185,47 @@ def test_milvus_store_reports_missing_document_when_collection_is_absent(monkeyp
     store = MilvusVectorStore(collection_name="chunks")
 
     assert store.document_exists("doc_123") is False
+
+
+def test_build_document_filter_escapes_scalar_value() -> None:
+    expression = build_document_filter('doc_"quoted"')
+
+    assert expression == 'document_id == "doc_\\\"quoted\\\""'
+
+
+def test_milvus_store_deletes_document_records(monkeypatch) -> None:
+    calls = []
+
+    class MutationResult:
+        delete_count = 3
+
+    class FakeCollection:
+        def __init__(self, **kwargs) -> None:
+            calls.append(("collection", kwargs))
+
+        def delete(self, **kwargs):
+            calls.append(("delete", kwargs))
+            return MutationResult()
+
+        def flush(self) -> None:
+            calls.append(("flush", None))
+
+    monkeypatch.setattr("pymilvus.utility.has_collection", lambda *args, **kwargs: True)
+    monkeypatch.setattr("pymilvus.Collection", FakeCollection)
+    store = MilvusVectorStore(collection_name="chunks", alias="runtime")
+
+    deleted_count = store.delete_document("doc_123")
+
+    assert deleted_count == 3
+    assert calls == [
+        ("collection", {"name": "chunks", "using": "runtime"}),
+        ("delete", {"expr": 'document_id == "doc_123"'}),
+        ("flush", None),
+    ]
+
+
+def test_milvus_store_delete_is_noop_without_collection(monkeypatch) -> None:
+    monkeypatch.setattr("pymilvus.utility.has_collection", lambda *args, **kwargs: False)
+    store = MilvusVectorStore(collection_name="chunks")
+
+    assert store.delete_document("doc_123") == 0
