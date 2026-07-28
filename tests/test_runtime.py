@@ -151,6 +151,10 @@ def test_build_runtime_resources_shares_retrievers_and_closes_stores(monkeypatch
     assert resources.ingestion_service.embedding_model is resources.vector_retriever.embedding_model
     assert resources.ingestion_service.graph_extractor.llm_client is resources.qa_service.llm_client
     assert resources.ingestion_service.lifecycle_service is resources.document_lifecycle_service
+    assert resources.ingestion_task_manager is not None
+    assert resources.ingestion_task_manager.ingestion_service is resources.ingestion_service
+    assert resources.ingestion_task_manager.queue_limit == settings.ingestion_task_queue_limit
+    assert resources.ingestion_task_manager.history_limit == settings.ingestion_task_history_limit
     readiness = resources.readiness()
     assert readiness.status == "ready"
     assert all(component.status == "ready" for component in readiness.components.values())
@@ -173,6 +177,7 @@ def test_build_runtime_resources_keeps_qa_unavailable_without_api_key(monkeypatc
 
     assert resources.qa_service is None
     assert resources.ingestion_service is None
+    assert resources.ingestion_task_manager is None
     assert resources.document_lifecycle_service is not None
     readiness = resources.readiness()
     assert readiness.status == "degraded"

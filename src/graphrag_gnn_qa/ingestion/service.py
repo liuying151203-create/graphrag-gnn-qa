@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import re
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, Protocol
@@ -15,6 +16,17 @@ from graphrag_gnn_qa.vectorstore.embedding import EmbeddingModel
 from graphrag_gnn_qa.vectorstore.milvus_client import EmbeddingRecord, infer_embedding_dimension
 
 DOCUMENT_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
+IngestionProgressStage = Literal[
+    "duplicate_check",
+    "parse",
+    "chunk",
+    "embedding",
+    "graph_extraction",
+    "cleanup",
+    "graph_write",
+    "vector_write",
+    "completed",
+]
 
 
 class IngestionVectorStore(Protocol):
@@ -67,6 +79,15 @@ class DocumentIngestionResult:
     deleted_relation_count: int
     deleted_entity_count: int
     timings: IngestionTimings
+
+
+@dataclass(frozen=True)
+class IngestionProgress:
+    stage: IngestionProgressStage
+    progress: int
+
+
+IngestionProgressCallback = Callable[[IngestionProgress], None]
 
 
 @dataclass(frozen=True)
@@ -248,6 +269,7 @@ class DocumentIngestionService:
         filename: str,
         content: bytes,
         overwrite: bool = False,
+        progress_callback: IngestionProgressCallback | None = None,
     ) -> DocumentIngestionResult:
         total_started = time.perf_counter()
         safe_filename = normalize_upload_filename(filename)
@@ -259,6 +281,7 @@ class DocumentIngestionService:
 
         content_sha256 = hashlib.sha256(content).hexdigest()
         document_id = build_content_document_id(content_sha256)
+        _notify_progress(progress_callback, "duplicate_check", 5)
         try:
             document_exists = self.vector_store.document_exists(document_id)
             if document_exists and not overwrite:
@@ -268,6 +291,7 @@ class DocumentIngestionService:
         except Exception as exc:
             raise IngestionStageError("duplicate_check", document_id, "failed", exc) from exc
 
+        _notify_progress(progress_callback, "parse", 10)
         parse_started = time.perf_counter()
         try:
             document = self.document_loader.load_bytes(
@@ -281,6 +305,7 @@ class DocumentIngestionService:
             raise IngestionStageError("parse", document_id, "failed", exc) from exc
         parse_ms = _elapsed_ms(parse_started)
 
+        _notify_progress(progress_callback, "chunk", 20)
         chunk_started = time.perf_counter()
         chunks = self.text_splitter.split(document.content, document_id=document_id)
         if not chunks:
@@ -300,25 +325,38 @@ class DocumentIngestionService:
         ]
         chunk_ms = _elapsed_ms(chunk_started)
 
+        _notify_progress(progress_callback, "embedding", 30)
         embedding_started = time.perf_counter()
         try:
-            embedding_records = self._build_embedding_records(chunk_records)
+            embedding_records = self._build_embedding_records(
+                chunk_records,
+                progress_callback=progress_callback,
+            )
         except Exception as exc:
             raise IngestionStageError("embedding", document_id, "failed", exc) from exc
         embedding_ms = _elapsed_ms(embedding_started)
 
+        _notify_progress(progress_callback, "graph_extraction", 55)
         graph_extraction_started = time.perf_counter()
         try:
-            graph_records = [
-                graph_result_to_dict(self.graph_extractor.extract_from_chunk(chunk))
-                for chunk in chunk_records
-            ]
+            graph_records = []
+            for index, chunk in enumerate(chunk_records):
+                graph_records.append(
+                    graph_result_to_dict(self.graph_extractor.extract_from_chunk(chunk))
+                )
+                graph_progress = 55 + int(20 * (index + 1) / len(chunk_records))
+                _notify_progress(
+                    progress_callback,
+                    "graph_extraction",
+                    graph_progress,
+                )
         except Exception as exc:
             raise IngestionStageError("graph_extraction", document_id, "failed", exc) from exc
         graph_extraction_ms = _elapsed_ms(graph_extraction_started)
 
         deletion_result = _empty_deletion_result(document_id)
         if overwrite:
+            _notify_progress(progress_callback, "cleanup", 78)
             try:
                 deletion_result = self.lifecycle_service.delete(
                     document_id=document_id,
@@ -335,6 +373,7 @@ class DocumentIngestionService:
                     deleted_entity_count=exc.deleted_entity_count,
                 ) from exc
 
+        _notify_progress(progress_callback, "graph_write", 82)
         graph_write_started = time.perf_counter()
         try:
             self.graph_store.upsert_graph_records(graph_records)
@@ -350,6 +389,7 @@ class DocumentIngestionService:
             ) from exc
         graph_write_ms = _elapsed_ms(graph_write_started)
 
+        _notify_progress(progress_callback, "vector_write", 92)
         vector_write_started = time.perf_counter()
         try:
             dimension = infer_embedding_dimension(embedding_records)
@@ -368,7 +408,7 @@ class DocumentIngestionService:
         vector_write_ms = _elapsed_ms(vector_write_started)
 
         entity_count, relation_count = count_graph_items(graph_records)
-        return DocumentIngestionResult(
+        result = DocumentIngestionResult(
             status="completed",
             operation=(
                 "replaced"
@@ -397,8 +437,14 @@ class DocumentIngestionService:
                 total_ms=_elapsed_ms(total_started),
             ),
         )
+        _notify_progress(progress_callback, "completed", 100)
+        return result
 
-    def _build_embedding_records(self, chunk_records: list[dict[str, Any]]) -> list[EmbeddingRecord]:
+    def _build_embedding_records(
+        self,
+        chunk_records: list[dict[str, Any]],
+        progress_callback: IngestionProgressCallback | None = None,
+    ) -> list[EmbeddingRecord]:
         records = []
         for start in range(0, len(chunk_records), self.embedding_batch_size):
             batch = chunk_records[start : start + self.embedding_batch_size]
@@ -416,6 +462,13 @@ class DocumentIngestionService:
                     embedding=[float(value) for value in embedding],
                 )
                 for chunk, embedding in zip(batch, embeddings)
+            )
+            processed_count = min(start + len(batch), len(chunk_records))
+            embedding_progress = 30 + int(20 * processed_count / len(chunk_records))
+            _notify_progress(
+                progress_callback,
+                "embedding",
+                embedding_progress,
             )
         return records
 
@@ -483,3 +536,21 @@ def _deleted_item_count(result: DocumentDeletionResult) -> int:
 
 def _elapsed_ms(started: float) -> float:
     return round((time.perf_counter() - started) * 1000, 3)
+
+
+def _notify_progress(
+    callback: IngestionProgressCallback | None,
+    stage: IngestionProgressStage,
+    progress: int,
+) -> None:
+    if callback is None:
+        return
+    try:
+        callback(
+            IngestionProgress(
+                stage=stage,
+                progress=max(0, min(100, int(progress))),
+            )
+        )
+    except Exception:
+        return

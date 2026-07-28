@@ -48,7 +48,7 @@
 
 上传单个文档并同步执行解析、切分、Embedding、实体关系抽取、Neo4j 写入和 Milvus 写入。
 
-当前状态：已实现同步 MVP。
+当前状态：同步上传和后台任务模式均已实现。
 
 请求形式：
 
@@ -142,10 +142,104 @@ curl.exe -X POST http://127.0.0.1:8000/documents/upload -F "overwrite=true" -F "
 
 当前限制：
 
-- 仅支持同步单文档上传，调用方需要等待全流程完成。
+- 同步接口会等待完整流程；耗时文档建议使用后台任务接口。
 - 内容变化会生成新的 `document_id`；更新后的文件需要先删除旧 ID，再上传新内容。
-- 尚未提供任务进度查询和后台队列。
 - 数据库写入不具备跨 Milvus 与 Neo4j 的分布式事务；接口通过写入顺序、稳定主键和结构化 `partial_failed` 状态降低并暴露该风险。
+
+### `POST /documents/upload/async`
+
+提交单文档后台入库任务。请求完成文件大小、文件名和扩展名校验后立即返回 HTTP 202；实际重复检查、解析、切分、Embedding、图谱抽取和双库写入由进程内 worker 执行。
+
+请求字段与同步接口一致：
+
+- `file`：必填，支持 TXT、Markdown 和 PDF。
+- `overwrite`：可选，默认为 `false`。
+
+```powershell
+curl.exe -X POST http://127.0.0.1:8000/documents/upload/async -F "file=@data/raw/sample.txt"
+```
+
+HTTP 202 响应：
+
+```json
+{
+  "task_id": "ing_2638287eac5d4cbf81cce36d5dc728aa",
+  "status": "pending",
+  "progress": 0,
+  "stage": "queued",
+  "filename": "sample.txt",
+  "overwrite": false,
+  "document_id": "doc_6d00a60f9e5194d777ba7b4a8c585768",
+  "created_at": "2026-07-28T06:20:00.000000Z",
+  "started_at": null,
+  "updated_at": "2026-07-28T06:20:00.000000Z",
+  "completed_at": null,
+  "result": null,
+  "error": null
+}
+```
+
+响应头 `Location` 指向 `/documents/tasks/{task_id}`。`document_id` 在提交时由内容哈希确定，即使任务尚未执行也可以用于关联日志和后续结果。
+
+### `GET /documents/tasks/{task_id}`
+
+查询后台入库任务快照：
+
+```powershell
+curl.exe http://127.0.0.1:8000/documents/tasks/ing_2638287eac5d4cbf81cce36d5dc728aa
+```
+
+状态语义：
+
+- `pending`：任务已进入当前进程队列，等待 worker。
+- `processing`：正在执行，`stage` 表示当前阶段，`progress` 为 0 到 99 的阶段估算值。
+- `completed`：处理成功，`progress` 为 100，`result` 与同步上传成功响应一致。
+- `failed`：写库前失败或未产生已知部分写入，错误位于 `error`。
+- `partial_failed`：清理或写库阶段部分完成，需要根据删除统计检查双库状态。
+
+处理中的响应示例：
+
+```json
+{
+  "task_id": "ing_2638287eac5d4cbf81cce36d5dc728aa",
+  "status": "processing",
+  "progress": 65,
+  "stage": "graph_extraction",
+  "filename": "sample.txt",
+  "overwrite": false,
+  "document_id": "doc_6d00a60f9e5194d777ba7b4a8c585768",
+  "created_at": "2026-07-28T06:20:00.000000Z",
+  "started_at": "2026-07-28T06:20:00.010000Z",
+  "updated_at": "2026-07-28T06:20:03.200000Z",
+  "completed_at": null,
+  "result": null,
+  "error": null
+}
+```
+
+失败时 `error` 使用脱敏结构：
+
+```json
+{
+  "code": "ingestion_stage_failed",
+  "message": "Document ingestion failed during vector_write",
+  "stage": "vector_write",
+  "deleted_chunk_count": 0,
+  "deleted_relation_count": 0,
+  "deleted_entity_count": 0
+}
+```
+
+任务 ID 不存在或已从历史记录淘汰时返回 HTTP 404。未配置 `LLM_API_KEY`、后台任务管理器不可用时返回 HTTP 503。
+
+后台任务当前边界：
+
+- 任务记录、排队文件和结果只保存在当前 FastAPI 进程内，不写入数据库或磁盘。
+- 服务重启后任务记录丢失；使用多个 Uvicorn worker 时，不同进程之间不能互查任务。
+- 默认单 worker，最多接受 10 个活动任务；使用 `INGESTION_TASK_WORKERS`、`INGESTION_TASK_QUEUE_LIMIT` 和 `INGESTION_TASK_HISTORY_LIMIT` 调整并发、队列上限和终态任务保留数量。
+- 活动任务达到上限时提交接口返回 HTTP 429 `ingestion_queue_full`，并携带 `Retry-After: 5`。
+- 当前不支持取消、手动重试和任务列表；生产部署应替换为 Redis/Celery 等持久化任务系统。
+- `progress` 表示流程阶段和批次完成比例，不是精确剩余时间。
 
 ### `DELETE /documents/{document_id}`
 

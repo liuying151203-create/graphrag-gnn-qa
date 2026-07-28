@@ -91,6 +91,27 @@ class GraphRAGApiClient:
             files={"file": (filename, content, content_type)},
         )
 
+    def queue_document_upload(
+        self,
+        filename: str,
+        content: bytes,
+        content_type: str = "application/octet-stream",
+        overwrite: bool = False,
+    ) -> ApiResult:
+        return self._request(
+            "POST",
+            "/documents/upload/async",
+            accepted_statuses={202},
+            data={"overwrite": str(overwrite).lower()},
+            files={"file": (filename, content, content_type)},
+        )
+
+    def get_ingestion_task(self, task_id: str) -> ApiResult:
+        return self._request(
+            "GET",
+            f"/documents/tasks/{task_id}",
+        )
+
     def delete_document(self, document_id: str) -> ApiResult:
         return self._request(
             "DELETE",

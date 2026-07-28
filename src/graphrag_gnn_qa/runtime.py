@@ -9,6 +9,7 @@ from graphrag_gnn_qa.ingestion.service import (
     DocumentIngestionService,
     DocumentLifecycleService,
 )
+from graphrag_gnn_qa.ingestion.tasks import IngestionTaskManager
 from graphrag_gnn_qa.llm.client import LLMClient, OpenAICompatibleLLMClient
 from graphrag_gnn_qa.rag.qa_service import RAGQAService
 from graphrag_gnn_qa.rerank import (
@@ -36,13 +37,18 @@ class RuntimeResources:
     reranker: EvidenceReranker
     qa_service: RAGQAService | None
     ingestion_service: DocumentIngestionService | None
+    ingestion_task_manager: IngestionTaskManager | None
     document_lifecycle_service: DocumentLifecycleService
 
     def close(self) -> None:
         try:
-            self.graph_store.close()
+            if self.ingestion_task_manager is not None:
+                self.ingestion_task_manager.close(wait=True)
         finally:
-            self.vector_store.close()
+            try:
+                self.graph_store.close()
+            finally:
+                self.vector_store.close()
 
     def readiness(self) -> "RuntimeReadiness":
         components = {
@@ -132,6 +138,16 @@ def build_runtime_resources(settings: Settings) -> RuntimeResources:
             llm_client=llm_client,
             lifecycle_service=document_lifecycle_service,
         )
+        ingestion_task_manager = (
+            IngestionTaskManager(
+                ingestion_service=ingestion_service,
+                max_workers=settings.ingestion_task_workers,
+                queue_limit=settings.ingestion_task_queue_limit,
+                history_limit=settings.ingestion_task_history_limit,
+            )
+            if ingestion_service is not None
+            else None
+        )
         return RuntimeResources(
             settings=settings,
             vector_store=vector_store,
@@ -141,6 +157,7 @@ def build_runtime_resources(settings: Settings) -> RuntimeResources:
             reranker=reranker,
             qa_service=qa_service,
             ingestion_service=ingestion_service,
+            ingestion_task_manager=ingestion_task_manager,
             document_lifecycle_service=document_lifecycle_service,
         )
     except Exception:

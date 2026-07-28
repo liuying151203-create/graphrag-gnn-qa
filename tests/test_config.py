@@ -53,6 +53,9 @@ def test_settings_default_document_ingestion_options() -> None:
     assert settings.ingestion_chunk_size == 800
     assert settings.ingestion_chunk_overlap == 120
     assert settings.ingestion_embedding_batch_size == 16
+    assert settings.ingestion_task_workers == 1
+    assert settings.ingestion_task_queue_limit == 10
+    assert settings.ingestion_task_history_limit == 100
 
 
 def test_settings_rejects_invalid_ingestion_chunk_overlap() -> None:
@@ -67,3 +70,14 @@ def test_settings_rejects_invalid_ingestion_chunk_overlap() -> None:
 def test_settings_rejects_chunk_size_larger_than_milvus_field() -> None:
     with pytest.raises(ValidationError):
         Settings(ingestion_chunk_size=8193, _env_file=None)
+
+
+def test_settings_rejects_invalid_ingestion_task_options() -> None:
+    with pytest.raises(ValueError):
+        Settings(ingestion_task_workers=0, _env_file=None)
+    with pytest.raises(ValueError):
+        Settings(ingestion_task_workers=9, _env_file=None)
+    with pytest.raises(ValueError):
+        Settings(ingestion_task_queue_limit=0, _env_file=None)
+    with pytest.raises(ValueError):
+        Settings(ingestion_task_history_limit=0, _env_file=None)

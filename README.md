@@ -131,17 +131,24 @@ curl.exe -X POST http://127.0.0.1:8000/documents/upload -F "file=@data/raw/sampl
 curl.exe -X POST http://127.0.0.1:8000/documents/upload -F "overwrite=true" -F "file=@data/raw/sample.txt"
 ```
 
+耗时较长的 PDF 可以提交到进程内后台任务，接口立即返回 HTTP 202 和 `task_id`：
+
+```powershell
+curl.exe -X POST http://127.0.0.1:8000/documents/upload/async -F "file=@data/raw/sample.txt"
+curl.exe http://127.0.0.1:8000/documents/tasks/<task_id>
+```
+
 使用上传响应中的 `document_id` 可以删除对应的向量和图谱证据：
 
 ```powershell
 curl.exe -X DELETE http://127.0.0.1:8000/documents/<document_id>
 ```
 
-Streamlit 工作台也提供上传、覆盖重建和确认删除入口。内容变化后会生成新的 ID，需要删除旧 ID 再上传新文件；详细契约见 [API 设计](docs/api.md)。
+Streamlit 工作台默认使用后台模式，提供阶段进度、手动刷新、覆盖重建和确认删除入口。任务记录保存在当前 FastAPI 进程内，服务重启后不会保留；内容变化后会生成新的 ID，需要删除旧 ID 再上传新文件。详细契约见 [API 设计](docs/api.md)。
 
 ## 当前已实现能力
 
-- Streamlit GraphRAG 演示工作台，支持服务状态、文档生命周期管理、预设问题、方法对比、引用追溯、阶段耗时和局部图谱视图
+- Streamlit GraphRAG 演示工作台，支持服务状态、后台入库进度、文档生命周期管理、预设问题、方法对比、引用追溯、阶段耗时和局部图谱视图
 - FastAPI 服务启动
 - FastAPI lifespan 运行时资源复用，避免每次请求重复加载 Embedding、Reranker 和数据库客户端
 - `/health` 健康检查接口
@@ -157,6 +164,7 @@ Streamlit 工作台也提供上传、覆盖重建和确认删除入口。内容�
 - `POST /retrieval/debug` 检索调试 API
 - `POST /qa/ask` GraphRAG-aware 问答 API
 - `POST /documents/upload` 同步文档入库 API，支持内容哈希、重复检测、覆盖重建、Milvus upsert、Neo4j MERGE 和阶段耗时
+- `POST /documents/upload/async` 与 `GET /documents/tasks/{task_id}` 后台入库和阶段进度查询 API
 - `DELETE /documents/{document_id}` 文档删除 API，清理向量、文档关系和可安全删除的孤立实体
 - 检索和问答分阶段耗时，覆盖 vector、graph、fusion、rerank 和 LLM
 - GraphRAG Context Builder，用于统一组织向量上下文、图谱上下文、混合证据上下文和 LLM prompt

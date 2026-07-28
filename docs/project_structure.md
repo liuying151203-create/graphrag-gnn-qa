@@ -78,6 +78,7 @@ graphrag-gnn-qa/
 │       │   ├── __init__.py
 │       │   ├── document_loader.py
 │       │   ├── service.py
+│       │   ├── tasks.py
 │       │   └── text_splitter.py
 │       ├── llm/
 │       │   ├── __init__.py
@@ -107,6 +108,7 @@ graphrag-gnn-qa/
 │   ├── test_documents_api.py
 │   ├── test_document_loader.py
 │   ├── test_ingestion_service.py
+│   ├── test_ingestion_tasks.py
 │   ├── test_context_builder.py
 │   ├── test_debug_api.py
 │   ├── test_embed_chunks.py
@@ -186,7 +188,7 @@ Streamlit 演示工作台配置目录。`config.toml` 定义页面主题、字�
 面向面试和本地复盘的 GraphRAG 演示层：
 
 - `app.py`：Streamlit Research Workbench 页面入口。
-- `api_client.py`：封装健康检查、检索、问答、文档上传和文档删除 HTTP 调用。
+- `api_client.py`：封装健康检查、检索、问答、同步或后台文档上传、任务查询和文档删除 HTTP 调用。
 - `components.py`：预设问题、数据统计、方法对比、citation 映射和局部图谱 DOT 构造逻辑。
 - `__init__.py`：Demo Python 包标记。
 
@@ -210,18 +212,20 @@ POST /graph/retrieve
 POST /retrieval/debug
 POST /qa/ask
 POST /documents/upload
+POST /documents/upload/async
+GET /documents/tasks/{task_id}
 DELETE /documents/{document_id}
 ```
 
 ### `runtime.py`
 
-应用级运行时资源模块，统一初始化和复用 Embedding、Milvus、Neo4j、VectorRetriever、GraphRetriever、Reranker、QA、文档入库和文档生命周期服务，负责组件就绪检查和数据库连接关闭。
+应用级运行时资源模块，统一初始化和复用 Embedding、Milvus、Neo4j、VectorRetriever、GraphRetriever、Reranker、QA、文档入库、后台任务和文档生命周期服务，负责组件就绪检查、等待后台任务结束和数据库连接关闭。
 
 ### `config.py`
 
 配置管理模块，基于 `pydantic-settings` 从 `.env` 读取配置。
 
-Neo4j、Milvus、LLM、Embedding、TopK、hybrid fusion 权重、rerank 参数、上传大小和入库切分参数等都会统一从这里读取。
+Neo4j、Milvus、LLM、Embedding、TopK、hybrid fusion 权重、rerank 参数、上传大小、入库切分参数、任务 worker 数、活动任务上限和历史记录上限等都会统一从这里读取。
 
 ### `api/`
 
@@ -232,7 +236,7 @@ API 路由目录。
 - `dependencies.py`：从 FastAPI `app.state` 获取应用级运行时资源
 - `routes_health.py`：健康检查接口
 - `routes_debug.py`：检索调试接口
-- `routes_documents.py`：同步文档上传、覆盖重建和删除接口
+- `routes_documents.py`：同步或后台文档上传、任务查询、覆盖重建和删除接口
 - `routes_graph.py`：图谱检索接口
 - `routes_qa.py`：问答接口
 - `routes_retrieve.py`：向量检索接口
@@ -250,14 +254,16 @@ GET /ready
 
 #### `routes_documents.py`
 
-提供同步文档上传和删除 API：
+提供同步或后台文档上传、任务查询和删除 API：
 
 ```text
 POST /documents/upload
+POST /documents/upload/async
+GET /documents/tasks/{task_id}
 DELETE /documents/{document_id}
 ```
 
-负责 multipart 文件大小限制、覆盖选项、文档 ID 校验、依赖检查、线程池调用、响应模型转换，以及重复、不存在和阶段失败的 HTTP 错误映射。
+负责 multipart 文件大小限制、覆盖选项、文档和任务 ID 查询、依赖检查、线程池调用、响应模型转换，以及重复、不存在和阶段失败的 HTTP 错误映射。
 
 #### `routes_retrieve.py`
 
@@ -315,6 +321,7 @@ POST /qa/ask
 
 - `document_loader.py`
 - `service.py`
+- `tasks.py`
 - `text_splitter.py`
 
 #### `document_loader.py`
@@ -356,9 +363,20 @@ POST /qa/ask
 - 调用 LLM 抽取实体关系
 - 使用 Neo4j MERGE 和 Milvus upsert 写入
 - 支持显式覆盖重建相同内容的索引
+- 通过可选回调报告重复检查、解析、切分、Embedding、图谱抽取、清理和双库写入进度
 - 返回数量统计、阶段耗时和结构化失败阶段
 
 `DocumentLifecycleService` 负责按 `document_id` 编排 Neo4j 与 Milvus 删除，返回双库删除数量、耗时和部分失败状态。
+
+#### `tasks.py`
+
+`IngestionTaskManager` 使用受限线程池复用同步入库服务：
+
+- 提交后立即生成 `task_id` 和稳定 `document_id`
+- 维护 pending、processing、completed、failed 和 partial_failed 状态
+- 保存当前阶段、百分比进度、时间戳、最终结果和脱敏错误
+- 默认单 worker 串行执行，限制活动任务数量并保留有限的进程内历史记录
+- FastAPI 关闭时等待已提交任务结束，再释放数据库连接
 
 ### `graph/`
 
@@ -899,8 +917,9 @@ graph_dataset.json
 当前测试覆盖：
 
 - FastAPI 健康检查接口
-- 文档上传 API 的成功、重复、大小、类型和阶段错误契约
-- 文档入库服务的稳定 ID、双库写入顺序、重复检测和部分失败
+- 同步与后台文档上传 API 的成功、重复、大小、类型、任务查询和阶段错误契约
+- 文档入库服务的稳定 ID、双库写入顺序、重复检测、阶段进度和部分失败
+- 后台任务管理器的排队、状态流转、历史淘汰和错误脱敏
 - Demo API 客户端、预设问题、数据统计、方法对比和图谱 DOT 构造
 - 文档读取模块
 - 文本切分模块

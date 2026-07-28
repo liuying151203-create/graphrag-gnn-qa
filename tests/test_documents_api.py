@@ -1,9 +1,12 @@
+from datetime import datetime, timezone
+
 from fastapi.testclient import TestClient
 
 from graphrag_gnn_qa.api.dependencies import get_runtime_resources
 from graphrag_gnn_qa.api.routes_documents import (
     get_document_ingestion_service,
     get_document_lifecycle_service,
+    get_ingestion_task_manager,
 )
 from graphrag_gnn_qa.config import Settings, get_settings
 from graphrag_gnn_qa.ingestion.service import (
@@ -17,6 +20,12 @@ from graphrag_gnn_qa.ingestion.service import (
     IngestionStageError,
     IngestionTimings,
     UnsupportedDocumentTypeError,
+)
+from graphrag_gnn_qa.ingestion.tasks import (
+    IngestionTaskError,
+    IngestionTaskNotFoundError,
+    IngestionTaskQueueFullError,
+    IngestionTaskSnapshot,
 )
 from graphrag_gnn_qa.main import app
 
@@ -87,6 +96,61 @@ class FakeLifecycleService:
                 total_ms=5.0,
             ),
         )
+
+
+class FakeTaskManager:
+    def __init__(
+        self,
+        task: IngestionTaskSnapshot,
+        get_error: Exception | None = None,
+        submit_error: Exception | None = None,
+    ) -> None:
+        self.task = task
+        self.get_error = get_error
+        self.submit_error = submit_error
+        self.submit_calls = []
+        self.get_calls = []
+
+    def submit(
+        self,
+        filename: str,
+        content: bytes,
+        overwrite: bool = False,
+    ) -> IngestionTaskSnapshot:
+        self.submit_calls.append((filename, content, overwrite))
+        if self.submit_error is not None:
+            raise self.submit_error
+        return self.task
+
+    def get(self, task_id: str) -> IngestionTaskSnapshot:
+        self.get_calls.append(task_id)
+        if self.get_error is not None:
+            raise self.get_error
+        return self.task
+
+
+def build_task_snapshot(
+    status: str = "pending",
+    result: DocumentIngestionResult | None = None,
+    error: IngestionTaskError | None = None,
+) -> IngestionTaskSnapshot:
+    now = datetime(2026, 7, 28, 1, 2, 3, tzinfo=timezone.utc)
+    terminal = status in {"completed", "failed", "partial_failed"}
+    return IngestionTaskSnapshot(
+        task_id="ing_123",
+        status=status,
+        progress=100 if status == "completed" else 40 if terminal else 0,
+        stage="completed" if status == "completed" else error.stage if error else "queued",
+        filename="paper.txt",
+        overwrite=False,
+        document_id="doc_123",
+        created_at=now,
+        started_at=now if status != "pending" else None,
+        updated_at=now,
+        completed_at=now if terminal else None,
+        result=result,
+        error=error,
+    )
 
 
 def teardown_function() -> None:
@@ -250,6 +314,123 @@ def test_upload_document_is_unavailable_without_ingestion_service() -> None:
     assert response.status_code == 503
     assert response.json() == {
         "detail": "LLM_API_KEY is not configured for document graph extraction"
+    }
+
+
+def test_queue_document_upload_returns_pending_task_and_location() -> None:
+    task_manager = FakeTaskManager(build_task_snapshot())
+    app.dependency_overrides[get_ingestion_task_manager] = lambda: task_manager
+    client = TestClient(app)
+
+    response = client.post(
+        "/documents/upload/async",
+        data={"overwrite": "true"},
+        files={"file": ("paper.txt", b"GraphRAG content", "text/plain")},
+    )
+
+    assert response.status_code == 202
+    assert response.headers["location"] == "/documents/tasks/ing_123"
+    assert task_manager.submit_calls == [("paper.txt", b"GraphRAG content", True)]
+    assert response.json()["task_id"] == "ing_123"
+    assert response.json()["status"] == "pending"
+    assert response.json()["progress"] == 0
+    assert response.json()["result"] is None
+    assert response.json()["error"] is None
+
+
+def test_get_document_ingestion_task_returns_completed_result() -> None:
+    result = FakeIngestionService().ingest("paper.txt", b"content")
+    task_manager = FakeTaskManager(
+        build_task_snapshot(status="completed", result=result)
+    )
+    app.dependency_overrides[get_ingestion_task_manager] = lambda: task_manager
+    client = TestClient(app)
+
+    response = client.get("/documents/tasks/ing_123")
+
+    assert response.status_code == 200
+    assert task_manager.get_calls == ["ing_123"]
+    assert response.json()["status"] == "completed"
+    assert response.json()["progress"] == 100
+    assert response.json()["result"]["operation"] == "created"
+    assert response.json()["result"]["chunk_count"] == 2
+
+
+def test_queue_document_upload_returns_retryable_queue_full_error() -> None:
+    task_manager = FakeTaskManager(
+        build_task_snapshot(),
+        submit_error=IngestionTaskQueueFullError(queue_limit=10),
+    )
+    app.dependency_overrides[get_ingestion_task_manager] = lambda: task_manager
+    client = TestClient(app)
+
+    response = client.post(
+        "/documents/upload/async",
+        files={"file": ("paper.txt", b"GraphRAG content", "text/plain")},
+    )
+
+    assert response.status_code == 429
+    assert response.headers["retry-after"] == "5"
+    assert response.json()["detail"] == {
+        "code": "ingestion_queue_full",
+        "queue_limit": 10,
+    }
+
+
+def test_get_document_ingestion_task_returns_partial_failure() -> None:
+    error = IngestionTaskError(
+        code="ingestion_stage_failed",
+        message="Document ingestion failed during vector_write",
+        stage="vector_write",
+        deleted_chunk_count=2,
+    )
+    task_manager = FakeTaskManager(
+        build_task_snapshot(status="partial_failed", error=error)
+    )
+    app.dependency_overrides[get_ingestion_task_manager] = lambda: task_manager
+    client = TestClient(app)
+
+    response = client.get("/documents/tasks/ing_123")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "partial_failed"
+    assert response.json()["error"] == {
+        "code": "ingestion_stage_failed",
+        "message": "Document ingestion failed during vector_write",
+        "stage": "vector_write",
+        "deleted_chunk_count": 2,
+        "deleted_relation_count": 0,
+        "deleted_entity_count": 0,
+    }
+
+
+def test_get_document_ingestion_task_maps_not_found() -> None:
+    task_manager = FakeTaskManager(
+        build_task_snapshot(),
+        get_error=IngestionTaskNotFoundError("ing_missing"),
+    )
+    app.dependency_overrides[get_ingestion_task_manager] = lambda: task_manager
+    client = TestClient(app)
+
+    response = client.get("/documents/tasks/ing_missing")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == {
+        "code": "ingestion_task_not_found",
+        "task_id": "ing_missing",
+    }
+
+
+def test_background_ingestion_is_unavailable_without_task_manager() -> None:
+    resources = type("Resources", (), {"ingestion_task_manager": None})()
+    app.dependency_overrides[get_runtime_resources] = lambda: resources
+    client = TestClient(app)
+
+    response = client.get("/documents/tasks/ing_123")
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "LLM_API_KEY is not configured for background document ingestion"
     }
 
 

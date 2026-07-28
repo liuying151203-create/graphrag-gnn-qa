@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal, Protocol
 
 import httpx
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
@@ -19,6 +20,12 @@ from graphrag_gnn_qa.ingestion.service import (
     DuplicateDocumentError,
     IngestionStageError,
     UnsupportedDocumentTypeError,
+)
+from graphrag_gnn_qa.ingestion.tasks import (
+    IngestionTaskError,
+    IngestionTaskNotFoundError,
+    IngestionTaskQueueFullError,
+    IngestionTaskSnapshot,
 )
 from graphrag_gnn_qa.runtime import RuntimeResources
 
@@ -51,6 +58,37 @@ class DocumentUploadResponse(BaseModel):
     timings: IngestionTimingsResponse
 
 
+class IngestionTaskErrorResponse(BaseModel):
+    code: str
+    message: str
+    stage: str
+    deleted_chunk_count: int
+    deleted_relation_count: int
+    deleted_entity_count: int
+
+
+class DocumentIngestionTaskResponse(BaseModel):
+    task_id: str
+    status: Literal[
+        "pending",
+        "processing",
+        "completed",
+        "failed",
+        "partial_failed",
+    ]
+    progress: int
+    stage: str
+    filename: str
+    overwrite: bool
+    document_id: str
+    created_at: datetime
+    started_at: datetime | None
+    updated_at: datetime
+    completed_at: datetime | None
+    result: DocumentUploadResponse | None
+    error: IngestionTaskErrorResponse | None
+
+
 class IngestionService(Protocol):
     def ingest(
         self,
@@ -67,6 +105,19 @@ class DocumentLifecycle(Protocol):
         document_id: str,
         require_exists: bool = True,
     ) -> DocumentDeletionResult:
+        ...
+
+
+class BackgroundIngestionTasks(Protocol):
+    def submit(
+        self,
+        filename: str,
+        content: bytes,
+        overwrite: bool = False,
+    ) -> IngestionTaskSnapshot:
+        ...
+
+    def get(self, task_id: str) -> IngestionTaskSnapshot:
         ...
 
 
@@ -112,6 +163,18 @@ def get_document_lifecycle_service(
     return lifecycle_service
 
 
+def get_ingestion_task_manager(
+    resources: RuntimeResources = Depends(get_runtime_resources),
+) -> BackgroundIngestionTasks:
+    task_manager = getattr(resources, "ingestion_task_manager", None)
+    if task_manager is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="LLM_API_KEY is not configured for background document ingestion",
+        )
+    return task_manager
+
+
 @router.post(
     "/upload",
     response_model=DocumentUploadResponse,
@@ -131,20 +194,7 @@ async def upload_document(
     settings: Settings = Depends(get_settings),
     ingestion_service: IngestionService = Depends(get_document_ingestion_service),
 ) -> DocumentUploadResponse:
-    filename = file.filename or ""
-    try:
-        content = await file.read(settings.document_upload_max_bytes + 1)
-    finally:
-        await file.close()
-
-    if len(content) > settings.document_upload_max_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-            detail={
-                "code": "document_too_large",
-                "max_bytes": settings.document_upload_max_bytes,
-            },
-        )
+    filename, content = await _read_upload(file, settings.document_upload_max_bytes)
 
     try:
         result = await run_in_threadpool(
@@ -187,22 +237,83 @@ async def upload_document(
             },
         ) from exc
 
-    return DocumentUploadResponse(
-        status=result.status,
-        operation=result.operation,
-        document_id=result.document_id,
-        content_sha256=result.content_sha256,
-        filename=result.filename,
-        file_type=result.file_type,
-        chunk_count=result.chunk_count,
-        embedding_count=result.embedding_count,
-        entity_count=result.entity_count,
-        relation_count=result.relation_count,
-        deleted_chunk_count=result.deleted_chunk_count,
-        deleted_relation_count=result.deleted_relation_count,
-        deleted_entity_count=result.deleted_entity_count,
-        timings=IngestionTimingsResponse(**result.timings.__dict__),
-    )
+    return _upload_response(result)
+
+
+@router.post(
+    "/upload/async",
+    response_model=DocumentIngestionTaskResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        status.HTTP_413_CONTENT_TOO_LARGE: {"description": "Document exceeds the configured size limit"},
+        status.HTTP_415_UNSUPPORTED_MEDIA_TYPE: {"description": "Unsupported document extension"},
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {"description": "Invalid document submission"},
+        status.HTTP_429_TOO_MANY_REQUESTS: {"description": "Background ingestion queue is full"},
+        status.HTTP_503_SERVICE_UNAVAILABLE: {"description": "Background ingestion is unavailable"},
+    },
+)
+async def queue_document_upload(
+    response: Response,
+    file: UploadFile = File(...),
+    overwrite: bool = Form(default=False),
+    settings: Settings = Depends(get_settings),
+    task_manager: BackgroundIngestionTasks = Depends(get_ingestion_task_manager),
+) -> DocumentIngestionTaskResponse:
+    filename, content = await _read_upload(file, settings.document_upload_max_bytes)
+    try:
+        task = task_manager.submit(
+            filename=filename,
+            content=content,
+            overwrite=overwrite,
+        )
+    except UnsupportedDocumentTypeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail={"code": "unsupported_document_type", "message": str(exc)},
+        ) from exc
+    except DocumentValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "invalid_document", "message": str(exc)},
+        ) from exc
+    except IngestionTaskQueueFullError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "code": "ingestion_queue_full",
+                "queue_limit": exc.queue_limit,
+            },
+            headers={"Retry-After": "5"},
+        ) from exc
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"code": "task_manager_unavailable", "message": str(exc)},
+        ) from exc
+    response.headers["Location"] = f"/documents/tasks/{task.task_id}"
+    return _task_response(task)
+
+
+@router.get(
+    "/tasks/{task_id}",
+    response_model=DocumentIngestionTaskResponse,
+    responses={
+        status.HTTP_404_NOT_FOUND: {"description": "Ingestion task does not exist"},
+        status.HTTP_503_SERVICE_UNAVAILABLE: {"description": "Background ingestion is unavailable"},
+    },
+)
+async def get_document_ingestion_task(
+    task_id: str,
+    task_manager: BackgroundIngestionTasks = Depends(get_ingestion_task_manager),
+) -> DocumentIngestionTaskResponse:
+    try:
+        task = task_manager.get(task_id)
+    except IngestionTaskNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "ingestion_task_not_found", "task_id": exc.task_id},
+        ) from exc
+    return _task_response(task)
 
 
 @router.delete(
@@ -270,3 +381,61 @@ def _stage_error_status(error: IngestionStageError) -> int:
     }:
         return status.HTTP_503_SERVICE_UNAVAILABLE
     return status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+async def _read_upload(file: UploadFile, max_bytes: int) -> tuple[str, bytes]:
+    filename = file.filename or ""
+    try:
+        content = await file.read(max_bytes + 1)
+    finally:
+        await file.close()
+    if len(content) > max_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail={
+                "code": "document_too_large",
+                "max_bytes": max_bytes,
+            },
+        )
+    return filename, content
+
+
+def _upload_response(result: DocumentIngestionResult) -> DocumentUploadResponse:
+    return DocumentUploadResponse(
+        status=result.status,
+        operation=result.operation,
+        document_id=result.document_id,
+        content_sha256=result.content_sha256,
+        filename=result.filename,
+        file_type=result.file_type,
+        chunk_count=result.chunk_count,
+        embedding_count=result.embedding_count,
+        entity_count=result.entity_count,
+        relation_count=result.relation_count,
+        deleted_chunk_count=result.deleted_chunk_count,
+        deleted_relation_count=result.deleted_relation_count,
+        deleted_entity_count=result.deleted_entity_count,
+        timings=IngestionTimingsResponse(**result.timings.__dict__),
+    )
+
+
+def _task_response(task: IngestionTaskSnapshot) -> DocumentIngestionTaskResponse:
+    return DocumentIngestionTaskResponse(
+        task_id=task.task_id,
+        status=task.status,
+        progress=task.progress,
+        stage=task.stage,
+        filename=task.filename,
+        overwrite=task.overwrite,
+        document_id=task.document_id,
+        created_at=task.created_at,
+        started_at=task.started_at,
+        updated_at=task.updated_at,
+        completed_at=task.completed_at,
+        result=_upload_response(task.result) if task.result is not None else None,
+        error=_task_error_response(task.error) if task.error is not None else None,
+    )
+
+
+def _task_error_response(error: IngestionTaskError) -> IngestionTaskErrorResponse:
+    return IngestionTaskErrorResponse(**error.__dict__)

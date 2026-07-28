@@ -111,3 +111,39 @@ def test_demo_api_client_uploads_and_deletes_document() -> None:
     assert requests[1].method == "DELETE"
     assert requests[1].url.path == "/documents/doc_123"
     assert deletion.status_code == 200
+
+
+def test_demo_api_client_queues_and_queries_ingestion_task() -> None:
+    requests = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.method == "POST":
+            return httpx.Response(
+                202,
+                json={"status": "pending", "task_id": "ing_123"},
+            )
+        return httpx.Response(
+            200,
+            json={"status": "processing", "task_id": "ing_123", "progress": 55},
+        )
+
+    client = GraphRAGApiClient(transport=httpx.MockTransport(handler))
+
+    queued = client.queue_document_upload(
+        filename="paper.txt",
+        content=b"GraphRAG content",
+        content_type="text/plain",
+        overwrite=True,
+    )
+    task = client.get_ingestion_task("ing_123")
+    client.close()
+
+    upload_body = requests[0].read()
+    assert queued.status_code == 202
+    assert requests[0].url.path == "/documents/upload/async"
+    assert b'name="overwrite"' in upload_body
+    assert b"true" in upload_body
+    assert requests[1].method == "GET"
+    assert requests[1].url.path == "/documents/tasks/ing_123"
+    assert task.data["progress"] == 55

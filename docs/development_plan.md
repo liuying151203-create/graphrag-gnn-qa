@@ -247,11 +247,11 @@ Demo 必须考虑面试现场网络不稳定：
 
 优先级：高。
 
-当前状态：Phase 2A 和 Phase 2B 已完成。
+当前状态：Phase 2A、Phase 2B 和 Phase 2C 已完成。
 
 - [x] Phase 2A：同步上传、稳定内容 ID、重复检测、Milvus upsert、Neo4j MERGE 和阶段错误。
 - [x] Phase 2B：按文档删除、覆盖重建、孤立实体清理和 Demo 上传入口。
-- [ ] Phase 2C：后台任务、pending/processing 状态和进度查询。
+- [x] Phase 2C：后台任务、pending/processing 状态和进度查询。
 
 目标：把命令行脚本整理为可复用服务，实现 `POST /documents/upload`。
 
@@ -265,7 +265,9 @@ Demo 必须考虑面试现场网络不稳定：
 - [x] Neo4j 支持按文档清理关系，并安全处理孤立实体。
 - [x] 上传接口支持 `overwrite=true` 覆盖重建同一内容的索引。
 - [x] Demo 增加上传、覆盖重建和确认删除入口，预设问题仍使用预构建数据保证稳定。
-- [ ] 稳定同步流程后再引入后台任务、pending/processing 状态和进度查询。
+- [x] 使用进程内 worker 执行后台任务，返回 pending、processing、completed、failed 和 partial_failed 状态。
+- [x] 同步入库服务提供阶段进度回调，API 和 Demo 支持按 `task_id` 查询进度。
+- [ ] 生产化时将进程内任务管理器替换为 Redis/Celery 等持久化队列，并增加取消、重试和任务列表能力。
 
 验收：
 
@@ -273,8 +275,9 @@ Demo 必须考虑面试现场网络不稳定：
 - 重复上传不会制造重复 chunk 和关系。
 - 任一步骤失败会返回阶段、错误信息和已完成统计。
 - 能删除文档并清理对应向量与图谱证据。
+- 后台提交立即返回任务 ID，能够查询阶段进度和最终入库结果。
 
-Phase 2A 和 Phase 2B 已通过存储层、服务层、API 与 Demo 客户端自动化测试；真实 BGE、LLM、Milvus 与 Neo4j 的上传、覆盖、删除和立即检索验收需要在项目基础服务启动后执行。
+Phase 2A、Phase 2B 和 Phase 2C 已通过存储层、服务层、任务管理、API 与 Demo 客户端自动化测试；真实 BGE、LLM、Milvus 与 Neo4j 的上传、覆盖、删除和立即检索验收需要在项目基础服务启动后执行。
 
 ### Phase 3：Rerank、融合与引用质量
 

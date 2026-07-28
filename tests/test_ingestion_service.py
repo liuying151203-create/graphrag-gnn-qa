@@ -169,6 +169,33 @@ def test_ingest_document_builds_stable_id_and_writes_both_stores() -> None:
     assert result.timings.cleanup_ms == 0
 
 
+def test_ingest_reports_monotonic_stage_progress() -> None:
+    service, _, _, _ = build_service()
+    progress_events = []
+
+    service.ingest(
+        filename="paper.txt",
+        content=b"abcdefghijklmnopqrstuvwxyz",
+        progress_callback=progress_events.append,
+    )
+
+    assert [event.progress for event in progress_events] == sorted(
+        event.progress for event in progress_events
+    )
+    assert progress_events[-1].stage == "completed"
+    assert progress_events[-1].progress == 100
+    assert {
+        "duplicate_check",
+        "parse",
+        "chunk",
+        "embedding",
+        "graph_extraction",
+        "graph_write",
+        "vector_write",
+        "completed",
+    }.issubset({event.stage for event in progress_events})
+
+
 def test_ingest_rejects_duplicate_before_expensive_work() -> None:
     vector_store = FakeVectorStore(document_exists=True)
     service, embedding_model, _, graph_store = build_service(vector_store=vector_store)

@@ -38,6 +38,26 @@ STATUS_LABELS = {
     "not_configured": "NOT CONFIGURED",
     "unknown": "UNKNOWN",
 }
+INGESTION_TASK_STATUS_LABELS = {
+    "pending": "等待执行",
+    "processing": "正在处理",
+    "completed": "处理完成",
+    "failed": "处理失败",
+    "partial_failed": "部分失败",
+}
+INGESTION_STAGE_LABELS = {
+    "queued": "任务排队",
+    "validation": "文档校验",
+    "duplicate_check": "重复检查",
+    "parse": "文档解析",
+    "chunk": "文本切分",
+    "embedding": "向量生成",
+    "graph_extraction": "图谱抽取",
+    "cleanup": "旧索引清理",
+    "graph_write": "图谱写入",
+    "vector_write": "向量写入",
+    "completed": "完成",
+}
 
 st.set_page_config(
     page_title="GraphRAG Research Workbench",
@@ -137,12 +157,77 @@ def upload_document(
         client.close()
 
 
+def queue_document_upload(
+    base_url: str,
+    filename: str,
+    content: bytes,
+    content_type: str,
+    overwrite: bool,
+) -> dict[str, Any]:
+    client = GraphRAGApiClient(base_url=base_url, timeout=30)
+    try:
+        return client.queue_document_upload(
+            filename=filename,
+            content=content,
+            content_type=content_type,
+            overwrite=overwrite,
+        ).data
+    finally:
+        client.close()
+
+
+def get_ingestion_task(base_url: str, task_id: str) -> dict[str, Any]:
+    client = GraphRAGApiClient(base_url=base_url, timeout=30)
+    try:
+        return client.get_ingestion_task(task_id).data
+    finally:
+        client.close()
+
+
 def delete_document(base_url: str, document_id: str) -> dict[str, Any]:
     client = GraphRAGApiClient(base_url=base_url, timeout=60)
     try:
         return client.delete_document(document_id).data
     finally:
         client.close()
+
+
+def render_ingestion_task(base_url: str) -> None:
+    task = st.session_state.get("document_ingestion_task")
+    if not task:
+        return
+
+    task_id = str(task.get("task_id") or "")
+    status_value = str(task.get("status") or "pending")
+    if st.button(
+        "刷新入库进度",
+        icon=":material/refresh:",
+        width="stretch",
+        disabled=not task_id or status_value in {"completed", "failed", "partial_failed"},
+    ):
+        try:
+            task = get_ingestion_task(base_url, task_id)
+        except DemoApiError as exc:
+            st.error(str(exc))
+        else:
+            st.session_state["document_ingestion_task"] = task
+            status_value = str(task.get("status") or "pending")
+
+    progress = max(0, min(100, int(task.get("progress") or 0)))
+    stage = str(task.get("stage") or "queued")
+    status_label = INGESTION_TASK_STATUS_LABELS.get(status_value, status_value)
+    stage_label = INGESTION_STAGE_LABELS.get(stage, stage)
+    st.progress(progress, text=f"{status_label} | {stage_label} | {progress}%")
+    st.caption(f"任务 ID：{task_id}")
+
+    if status_value == "completed" and task.get("result"):
+        st.session_state["document_upload_result"] = task["result"]
+        fetch_readiness.clear()
+    elif status_value in {"failed", "partial_failed"}:
+        error = task.get("error") or {}
+        st.error(
+            f"{status_label}：{error.get('message') or '后台入库未完成'}"
+        )
 
 
 def render_document_management(base_url: str) -> None:
@@ -160,6 +245,12 @@ def render_document_management(base_url: str) -> None:
             type=["txt", "md", "markdown", "pdf"],
             key="document_upload_file",
         )
+        background_processing = st.checkbox(
+            "后台处理并显示进度",
+            value=True,
+            key="document_background_processing",
+            disabled=uploaded_file is None,
+        )
         overwrite = st.checkbox(
             "覆盖相同内容的已有索引",
             key="document_overwrite",
@@ -173,22 +264,42 @@ def render_document_management(base_url: str) -> None:
             disabled=uploaded_file is None,
         )
         if upload_requested and uploaded_file is not None:
-            with st.spinner("正在解析、抽取并写入双库..."):
+            spinner_text = (
+                "正在提交后台入库任务..."
+                if background_processing
+                else "正在解析、抽取并写入双库..."
+            )
+            with st.spinner(spinner_text):
                 try:
-                    result = upload_document(
-                        base_url=base_url,
-                        filename=uploaded_file.name,
-                        content=uploaded_file.getvalue(),
-                        content_type=uploaded_file.type or "application/octet-stream",
-                        overwrite=overwrite,
-                    )
+                    if background_processing:
+                        result = queue_document_upload(
+                            base_url=base_url,
+                            filename=uploaded_file.name,
+                            content=uploaded_file.getvalue(),
+                            content_type=uploaded_file.type or "application/octet-stream",
+                            overwrite=overwrite,
+                        )
+                    else:
+                        result = upload_document(
+                            base_url=base_url,
+                            filename=uploaded_file.name,
+                            content=uploaded_file.getvalue(),
+                            content_type=uploaded_file.type or "application/octet-stream",
+                            overwrite=overwrite,
+                        )
                 except DemoApiError as exc:
                     st.error(str(exc))
                 else:
-                    st.session_state["document_upload_result"] = result
+                    if background_processing:
+                        st.session_state["document_ingestion_task"] = result
+                        st.session_state.pop("document_upload_result", None)
+                    else:
+                        st.session_state["document_upload_result"] = result
+                        st.session_state.pop("document_ingestion_task", None)
                     st.session_state.pop("document_deletion_result", None)
                     fetch_readiness.clear()
 
+        render_ingestion_task(base_url)
         upload_result = st.session_state.get("document_upload_result")
         if not upload_result:
             return
@@ -225,6 +336,7 @@ def render_document_management(base_url: str) -> None:
                 else:
                     st.session_state["document_deletion_result"] = deletion_result
                     st.session_state.pop("document_upload_result", None)
+                    st.session_state.pop("document_ingestion_task", None)
                     fetch_readiness.clear()
                     st.rerun()
 

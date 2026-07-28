@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     ingestion_chunk_size: int = Field(default=800, ge=1, le=8192)
     ingestion_chunk_overlap: int = Field(default=120, ge=0)
     ingestion_embedding_batch_size: int = Field(default=16, ge=1)
+    ingestion_task_workers: int = Field(default=1, ge=1, le=8)
+    ingestion_task_queue_limit: int = Field(default=10, ge=1, le=1000)
+    ingestion_task_history_limit: int = Field(default=100, ge=1, le=10000)
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

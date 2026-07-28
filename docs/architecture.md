@@ -36,6 +36,16 @@ Streamlit Demo 或其他 HTTP 客户端
   -> LLM 生成答案
   -> 返回 answer、sources、graph_sources 和 citations
 
+在线文档入库：
+
+Streamlit Demo 或其他 HTTP 客户端
+  -> 同步上传，或提交后台任务并获得 task_id
+  -> IngestionTaskManager 单机任务执行器
+  -> DocumentIngestionService 阶段进度回调
+  -> 文档解析、切分、Embedding 和图谱抽取
+  -> Neo4j 与 Milvus 写入
+  -> 查询任务状态、阶段进度和最终结果
+
 后续增强：
 
 Neo4j 知识图谱
@@ -58,7 +68,7 @@ Neo4j 知识图谱
 - 通过 HTTP 调用 FastAPI，不直接连接 Milvus、Neo4j 或 LLM
 - 展示 API、Embedding、Milvus、Neo4j、Reranker 和 LLM 就绪状态
 - 提供预设问题、自定义问题、Vector TopK、Graph TopK 和 Graph Depth 控件
-- 提供文档上传、相同内容覆盖重建、结果统计和确认删除入口
+- 提供同步或后台文档上传、阶段进度、相同内容覆盖重建、结果统计和确认删除入口
 - 展示答案、citations、分阶段耗时以及 Vector-only 与 GraphRAG hybrid 对比
 - 使用证据 Tabs 和 Graphviz 局部图展示检索中间结果
 - 后端不可用时展示明确标记的样例快照；请求失败时保留上一份成功结果
@@ -76,12 +86,10 @@ Neo4j 知识图谱
 - `POST /retrieval/debug`：向量、图谱和混合检索调试接口
 - `POST /qa/ask`：GraphRAG-aware 问答接口
 - `POST /documents/upload`：单文档同步解析、切分、Embedding、图谱抽取和双库写入
+- `POST /documents/upload/async`：提交进程内后台入库任务并返回任务 ID
+- `GET /documents/tasks/{task_id}`：查询任务状态、当前阶段、进度、结果或脱敏错误
 - `DELETE /documents/{document_id}`：按文档删除向量、关系和可安全清理的孤立实体
-- FastAPI lifespan：应用启动时初始化运行时资源，关闭时释放 Milvus 和 Neo4j 连接
-
-待实现：
-
-- 后台入库任务和进度查询接口
+- FastAPI lifespan：应用启动时初始化运行时资源，关闭时等待后台任务并释放 Milvus 和 Neo4j 连接
 
 ### 运行时资源层
 
@@ -89,11 +97,12 @@ Neo4j 知识图谱
 
 当前已实现：
 
-- `RuntimeResources`：统一持有 Embedding、Milvus、Neo4j、VectorRetriever、GraphRetriever、Reranker、QA、文档入库和生命周期服务
+- `RuntimeResources`：统一持有 Embedding、Milvus、Neo4j、VectorRetriever、GraphRetriever、Reranker、QA、文档入库、后台任务和生命周期服务
 - `build_runtime_resources`：按应用生命周期初始化资源，避免每次请求重复加载模型或创建数据库客户端
 - API 依赖从 `app.state.runtime_resources` 获取共享实例
-- 未配置 `LLM_API_KEY` 时保留检索能力，`/qa/ask` 和 `/documents/upload` 明确返回 503
-- 应用关闭时同时释放 Neo4j driver 和 Milvus connection
+- 未配置 `LLM_API_KEY` 时保留检索和删除能力，问答、同步上传和后台上传明确返回 503
+- `IngestionTaskManager` 默认单 worker，任务结束前不会释放共用数据库连接
+- 应用关闭时先等待后台任务，再释放 Neo4j driver 和 Milvus connection
 - `RuntimeResources.readiness`：执行 Milvus 和 Neo4j 探针，并汇总模型、Reranker 与 LLM 配置状态
 - 就绪探针失败时返回脱敏的组件状态，不返回内部连接异常详情
 
@@ -109,6 +118,7 @@ Neo4j 知识图谱
 - `RERANKER_TYPE` 可配置为 `keyword` 或 `bge`
 - `RERANK_TOP_K` 可配置，并要求大于等于 1
 - 文档大小、入库 chunk 参数和 Embedding batch size 可配置，并校验 overlap 小于 chunk size
+- `INGESTION_TASK_WORKERS`、`INGESTION_TASK_QUEUE_LIMIT` 和 `INGESTION_TASK_HISTORY_LIMIT` 控制后台并发、活动任务上限和进程内历史上限
 
 ### 文档处理层
 
@@ -119,10 +129,13 @@ Neo4j 知识图谱
 - `DocumentLoader`：文档读取
 - `DocumentLoader.load_bytes`：直接解析上传字节，文件名经过规范化，不落临时文件
 - `TextSplitter`：固定长度重叠文本切分
-- `DocumentIngestionService`：统一编排重复检测、解析、切分、Embedding、图谱抽取和双库写入
+- `DocumentIngestionService`：统一编排重复检测、解析、切分、Embedding、图谱抽取和双库写入，并通过可选回调报告阶段进度
+- `IngestionTaskManager`：使用受限线程池和有界活动任务数执行入库，维护状态快照、时间戳、结果和脱敏错误
 - `DocumentLifecycleService`：统一编排按文档删除，并返回双库删除数量与部分失败状态
 - `scripts/ingest_documents.py`：生成 `data/processed/chunks.jsonl`
 - `POST /documents/upload`：同步单文档入库，返回数量、状态和分阶段耗时
+- `POST /documents/upload/async`：后台提交，立即返回 pending 任务
+- `GET /documents/tasks/{task_id}`：查询 processing、completed、failed 或 partial_failed 状态
 - `overwrite=true`：新模型结果计算成功后，清理相同内容的旧索引并重建
 - `DELETE /documents/{document_id}`：删除已入库文档
 
@@ -239,6 +252,7 @@ Neo4j 知识图谱
 - GraphRAG 混合检索证据建模、融合排序和去重
 - `/retrieve`、`/graph/retrieve`、`/retrieval/debug`、`/qa/ask` API
 - `/documents/upload` 同步入库、覆盖重建、内容哈希、重复检测和结构化阶段错误
+- 后台入库任务、阶段进度回调和任务状态查询
 - `DELETE /documents/{document_id}` 双库删除和孤立实体清理
 - GraphRAG Context Builder 和 QA citations
 - 可配置 fusion 权重
@@ -253,11 +267,11 @@ Neo4j 知识图谱
 - 实验数据集：已有样例问题集和 20 条小规模 dev set，尚未扩展为更稳定、更贴近真实文档的评估集
 - Rerank：已接入轻量规则 rerank 和可配置 BGE Reranker，仍需补充消融评估
 - GNN：已完成图结构导出，尚未完成节点特征构造、GAT 训练和 GNN 辅助召回
-- 文档导入：同步上传、稳定 ID、幂等写入、覆盖重建和删除已实现，尚未提供后台任务和进度查询
+- 文档导入：同步与后台上传、稳定 ID、幂等写入、覆盖重建、删除和进度查询已实现；当前任务记录仅保存在单个 API 进程内
 
 ### 待实现
 
-- 后台入库任务和进度查询 API
+- Redis/Celery 等持久化任务队列、跨进程状态共享、任务取消与自动重试
 - GNN 节点特征构造、GAT 训练、节点向量写入和 GNN 辅助召回
 - BGE Reranker、rerank/no-rerank 和不同 reranker 类型的消融评估
 - 更完整的实验对比报告和消融实验
